@@ -165,9 +165,18 @@ function ReplOperator(type, ...)
     end
 end
 
-opts = {noremap=true, silent=true, buffer=true}
+opts = {noremap=true, silent=true}
+-- FIXME: slowing down quickfix jump
 keymap.set("n", "<CR><CR>", ":lua kittySendLine()<CR>", opts)
 keymap.set("x", "<CR>", ":lua kittySendVisual()<CR>", opts)
-keymap.set('n', "<CR>", 'Operator("v:lua.ReplOperator")', {expr=true, noremap=false})
--- some other keybindings are in whichkey.lua
+keymap.set('n', "<CR>", [[&buftype ==# "" ? Operator("v:lua.ReplOperator") : "\<CR>"]], {expr=true, noremap=false})
+keymap.set('n', "<leader><CR>", ":lua kittyWindow()<CR>", opts)
 
+
+-- TODO: add setup options
+function setup()
+end
+
+return {
+    setup = setup
+}
