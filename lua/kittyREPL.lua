@@ -106,8 +106,10 @@ function kittySendSOH(text)
 end
 
 function kittySendPaste(text)
+    -- get diretory of current script https://stackoverflow.com/questions/6380820/get-containing-path-of-lua-file
+    dir = debug.getinfo(1).source:match("@?(.*/)")
     -- kittyPaste.sh uses zsh to do bracketed paste cat from stdin to stdout.
-    fh = io.popen('../bracketedPaste.sh ' .. vim.b.repl_id, 'w')
+    fh = io.popen(dir .. '/../bracketedPaste.sh ' .. vim.b.repl_id, 'w')
     fh:write(text)
     fh:close()
 end
