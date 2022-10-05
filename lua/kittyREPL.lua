@@ -16,6 +16,7 @@ end
 local cmdline2filetype = {
     python3="python",
     ipython="python",
+    IPython="python",
     R="r",
     radian="r",
 }
@@ -50,6 +51,14 @@ function search_repl()
                                 set_repl(win["id"])
                                 return win["id"]
                             end
+                        end
+                        -- for proc over SSH the foreground_processes.cmdline will simply be ["ssh", ...]
+                        -- so we check the title as well
+                        repl = string.match(win["title"], "^[%w]+")
+                        repl = cmdline2filetype[repl] or repl
+                        if repl == vim.bo.filetype then
+                            set_repl(win["id"])
+                            return win["id"]
                         end
                     end
                 end
@@ -115,16 +124,14 @@ function kittySendPaste(text)
 end
 
 -- not all REPLs support bracketed paste
-local filetype2paste = {
-    lua=kittySendRaw
-}
+-- local filetype2paste = { "python", "r", "julia" }
+local filetype2paste = { "python", "r", "julia" }
 
 function kittySend(text)
-    sendf = filetype2paste[vim.bo.filetype]
-    if sendf ~= nil then
-        sendf(text)
-    else
+    if filetype2paste[vim.bo.filetype] ~= nil then
         kittySendPaste(text)
+    else
+        kittySendRaw(text)
     end
 end
 
