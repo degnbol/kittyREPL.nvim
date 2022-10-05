@@ -124,8 +124,7 @@ function kittySendPaste(text)
 end
 
 -- not all REPLs support bracketed paste
--- local filetype2paste = { "python", "r", "julia" }
-local filetype2paste = {}
+local filetype2paste = { "python", "r", "julia" }
 
 function kittySend(text)
     if filetype2paste[vim.bo.filetype] ~= nil then
