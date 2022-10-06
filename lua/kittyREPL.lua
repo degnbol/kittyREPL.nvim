@@ -54,11 +54,14 @@ function search_repl()
                         end
                         -- for proc over SSH the foreground_processes.cmdline will simply be ["ssh", ...]
                         -- so we check the title as well
-                        repl = string.match(win["title"], "^[%w]+")
-                        repl = cmdline2filetype[repl] or repl
-                        if repl == vim.bo.filetype then
-                            set_repl(win["id"])
-                            return win["id"]
+                        -- "IPython: ..." -> IPython
+                        -- "server-name: julia" -> julia
+                        for repl in string.gmatch(win["title"], "[%w]+") do
+                            repl = cmdline2filetype[repl] or repl
+                            if repl == vim.bo.filetype then
+                                set_repl(win["id"])
+                                return win["id"]
+                            end
                         end
                     end
                 end
