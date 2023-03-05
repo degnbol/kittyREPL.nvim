@@ -33,34 +33,37 @@ function search_repl()
             for i_tab, tab in ipairs(os_win["tabs"]) do
                 if tab["is_focused"] then
                     for i_win, win in ipairs(tab["windows"]) do
-                        -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`, 
-                        -- then PlotlyJS will open other processes that are listed earlier in the list. 
-                        -- If there are any problems then just loop and look in all foreground processes.
-                        procs = win["foreground_processes"]
-                        cmdline = procs[#procs]["cmdline"]
-                        -- ["/usr/local/bin/julia", "-t", "4"] -> julia
-                        -- [".../R"] -> r
-                        -- ["nvim", ".../file.R"] -/-> r. Make sure we don't set the nvim editor as the REPL by accepting "." in the name match. 
-                        -- ["../Python", ".../radian"] -> r
-                        -- [".../python3"] -> python
-                        for i_arg, arg in ipairs(cmdline) do
-                            -- match letters, numbers and period until the end of string arg.
-                            repl = string.match(arg, "[%w.]+$")
-                            repl = cmdline2filetype[repl] or repl
-                            if repl == vim.bo.filetype then
-                                set_repl(win["id"])
-                                return win["id"]
+                        -- the active window is the editor so we would never send to it.
+                        if not win["is_active_window"] then
+                            -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`, 
+                            -- then PlotlyJS will open other processes that are listed earlier in the list. 
+                            -- If there are any problems then just loop and look in all foreground processes.
+                            procs = win["foreground_processes"]
+                            cmdline = procs[#procs]["cmdline"]
+                            -- ["/usr/local/bin/julia", "-t", "4"] -> julia
+                            -- [".../R"] -> r
+                            -- ["nvim", ".../file.R"] -/-> r. Make sure we don't set the nvim editor as the REPL by accepting "." in the name match. 
+                            -- ["../Python", ".../radian"] -> r
+                            -- [".../python3"] -> python
+                            for i_arg, arg in ipairs(cmdline) do
+                                -- match letters, numbers and period until the end of string arg.
+                                repl = string.match(arg, "[%w.]+$")
+                                repl = cmdline2filetype[repl] or repl
+                                if repl == vim.bo.filetype then
+                                    set_repl(win["id"])
+                                    return win["id"]
+                                end
                             end
-                        end
-                        -- for proc over SSH the foreground_processes.cmdline will simply be ["ssh", ...]
-                        -- so we check the title as well
-                        -- "IPython: ..." -> IPython
-                        -- "server-name: julia" -> julia
-                        for repl in string.gmatch(win["title"], "[%w]+") do
-                            repl = cmdline2filetype[repl] or repl
-                            if repl == vim.bo.filetype then
-                                set_repl(win["id"])
-                                return win["id"]
+                            -- for proc over SSH the foreground_processes.cmdline will simply be ["ssh", ...]
+                            -- so we check the title as well
+                            -- "IPython: ..." -> IPython
+                            -- "server-name: julia" -> julia
+                            for repl in string.gmatch(win["title"], "[%w]+") do
+                                repl = cmdline2filetype[repl] or repl
+                                if repl == vim.bo.filetype then
+                                    set_repl(win["id"])
+                                    return win["id"]
+                                end
                             end
                         end
                     end
@@ -75,7 +78,7 @@ cmd 'au BufEnter * lua search_repl()'
 
 -- command to execute in new kitty window
 local filetype2command = {
-    python="~/miniconda3/bin/ipython",
+    python="ipython",
     julia="julia",
     -- kitty command doesn't know where R is since it doesn't have all the env copied.
     r="radian --r-binary /Library/Frameworks/R.framework/Resources/R",
