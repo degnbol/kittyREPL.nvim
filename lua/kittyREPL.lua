@@ -12,8 +12,8 @@ function set_repl(window_id)
     vim.b.repl_id = window_id
 end
 
-local function get_focused_windows()
- fh = io.popen('kitty @ ls 2> /dev/null')
+local function get_focused_tab()
+    fh = io.popen('kitty @ ls 2> /dev/null')
     json_string = fh:read("*a")
     -- if we are not in fact in a kitty terminal then the command will fail
     if json_string == "" then return end
@@ -23,11 +23,14 @@ local function get_focused_windows()
         if os_win["is_focused"] then
             for i_tab, tab in ipairs(os_win["tabs"]) do
                 if tab["is_focused"] then
-                    return tab["windows"]
+                    return tab
                 end
             end
         end
     end   
+end
+local function get_focused_windows()
+    return get_focused_tab()["windows"]
 end
 
 -- Get window id of the ith window visible on the current tab.
@@ -41,6 +44,12 @@ function repl_prompt()
     i = tonumber(vim.fn.input("Window i: "))
     winid = get_winid(i)
     set_repl(winid)
+end
+
+-- set REPL window id to the last active window
+function set_repl_last()
+    hist = get_focused_tab()["active_window_history"]
+    set_repl(hist[#hist])
 end
 
 -- kitty @ ls foreground_processes cmdline value 
