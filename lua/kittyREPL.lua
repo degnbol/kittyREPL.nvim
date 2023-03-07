@@ -15,6 +15,7 @@ end
 local function get_focused_tab()
     fh = io.popen('kitty @ ls 2> /dev/null')
     json_string = fh:read("*a")
+    fh:close()
     -- if we are not in fact in a kitty terminal then the command will fail
     if json_string == "" then return end
     
@@ -52,6 +53,16 @@ function set_repl_last()
     set_repl(hist[#hist])
 end
 
+-- change kitty focus from editor to REPL
+function focus_repl()
+    if vim.b.repl_id == nil then
+        print("No REPL")
+    else
+        fh = io.popen('kitty @ focus-window --match id:' .. vim.b.repl_id)
+        fh:close()
+    end
+end
+
 -- kitty @ ls foreground_processes cmdline value 
 local cmdline2filetype = {
     python3="python",
@@ -64,6 +75,7 @@ local cmdline2filetype = {
 function search_repl()
     fh = io.popen('kitty @ ls 2> /dev/null')
     json_string = fh:read("*a")
+    fh:close()
     -- if we are not in fact in a kitty terminal then the command will fail
     if json_string == "" then return end
     
