@@ -117,9 +117,6 @@ function search_repl()
     end
 end
 
--- register an autocommand to run this when entering buffers
-cmd 'au BufEnter * lua search_repl()'
-
 -- command to execute in new kitty window
 local filetype2command = {
     python="ipython",
@@ -198,10 +195,10 @@ function kittySendVisual()
     if not replCheck() then
         print("No REPL")
     else
-        -- gv  = reselect last select (unselected for some reason)
+        -- NOTE: old nvim versions needed gv to first reselect last select.
         -- "ky = yank to register k (k for kitty)
         -- `>  = go to mark ">" = end of last visual select
-        cmd 'silent normal! gv"ky`>'
+        cmd 'silent normal! "ky`>'
         kittySend(fn.getreg('k'))
     end
 end
@@ -223,16 +220,41 @@ function ReplOperator(type, ...)
     end
 end
 
-opts = {noremap=true, silent=true}
--- FIXME: slowing down quickfix jump
-keymap.set("n", "<CR><CR>", ":lua kittySendLine()<CR>", opts)
-keymap.set("x", "<CR>", ":lua kittySendVisual()<CR>", opts)
-keymap.set('n', "<CR>", [[&buftype ==# "" ? Operator("v:lua.ReplOperator") : "\<CR>"]], {expr=true, noremap=false})
-keymap.set('n', "<leader><CR>", ":lua kittyWindow()<CR>", opts)
+local defaults = {
+    keymap = {
+        line = "<plug>kittyReplLine",
+        visual = "<plug>kittyReplVisual",
+        operator = "<plug>kittyRepl",
+        win = "<plug>kittyReplWin",
+    },
+    exclude = {},
+}
 
+function setup(conf)
+    -- set defaults
+    conf = conf or defaults
+    conf.keymap = conf.keymap or defaults.keymap
+    for key, default in pairs(defaults.keymap) do
+        conf.keymap[key] = conf.keymap[key] or default
+    end
+    conf.exclude = conf.exclude or defaults.exclude
+    
+    local group = vim.api.nvim_create_augroup("kittyRepl", {clear=true})
+    -- BufEnter is too early for e.g. cmdline window to assign buftype
+    vim.api.nvim_create_autocmd("Filetype", {
+        group = group,
+        callback = function ()
+            if vim.bo.buftype ~= "" then return end 
+            if conf.exclude[vim.bo.filetype] then return end
 
--- TODO: add setup options
-function setup()
+            print(vim.bo.buftype)
+            opts = {noremap=true, silent=true, buffer=true}
+            keymap.set('n', conf.keymap.line, kittySendLine, opts)
+            keymap.set('x', conf.keymap.visual, kittySendVisual, opts)
+            keymap.set('n', conf.keymap.operator, "Operator('v:lua.ReplOperator')", {expr=true, silent=true, buffer=true})
+            keymap.set('n', conf.keymap.win, kittyWindow, opts)
+        end
+    })
 end
 
 return {
