@@ -227,7 +227,9 @@ local defaults = {
         operator = "<plug>kittyRepl",
         win = "<plug>kittyReplWin",
     },
-    exclude = {},
+    exclude = {
+        TelescopePrompt=true -- redundant since buftype is prompt.
+    },
 }
 
 function setup(conf)
@@ -238,6 +240,9 @@ function setup(conf)
         conf.keymap[key] = conf.keymap[key] or default
     end
     conf.exclude = conf.exclude or defaults.exclude
+    for key, default in pairs(defaults.exclude) do
+        conf.exclude[key] = conf.exclude[key] or default
+    end
     
     local group = vim.api.nvim_create_augroup("kittyRepl", {clear=true})
     -- BufEnter is too early for e.g. cmdline window to assign buftype
