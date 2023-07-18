@@ -228,7 +228,8 @@ local defaults = {
         win = "<plug>kittyReplWin",
     },
     exclude = {
-        TelescopePrompt=true -- redundant since buftype is prompt.
+        TelescopePrompt=true, -- redundant since buftype is prompt.
+        oil=true,
     },
 }
 
