@@ -39,22 +39,25 @@ function get_winid(i)
     return get_focused_windows()[i]["id"]
 end
 
--- manually set repl as th ith visible window from a prompt.
+-- manually set repl as ith visible window from a prompt.
 -- Useful to have keybinding to this function.
-function repl_prompt()
+function ReplSetI()
     i = tonumber(vim.fn.input("Window i: "))
-    winid = get_winid(i)
+    set_repl(get_winid(i))
+end
+function ReplSet()
+    winid = tonumber(vim.fn.input("Window id: "))
     set_repl(winid)
 end
 
 -- set REPL window id to the last active window
-function set_repl_last()
+function ReplSetLast()
     hist = get_focused_tab()["active_window_history"]
     set_repl(hist[#hist])
 end
 
 -- change kitty focus from editor to REPL
-function focus_repl()
+local function ReplFocus()
     if vim.b.repl_id == nil then
         print("No REPL")
     else
@@ -126,7 +129,7 @@ local filetype2command = {
     lua="lua",
 }
 
-function kittyWindow()
+function ReplWindow()
     -- default to zsh
     ftcommand = filetype2command[vim.bo.filetype] or ""
     fh = io.popen('kitty @ launch --cwd=current --keep-focus ' .. ftcommand)
@@ -181,7 +184,7 @@ function kittySend(text)
     end
 end
 
-function kittySendLine()
+function ReplSendLine()
     if not replCheck() then
         print("No REPL")
     else
@@ -191,7 +194,7 @@ function kittySendLine()
     end
 end
 
-function kittySendVisual()
+function ReplSendVisual()
     if not replCheck() then
         print("No REPL")
     else
@@ -222,10 +225,13 @@ end
 
 local defaults = {
     keymap = {
-        line = "<plug>kittyReplLine",
-        visual = "<plug>kittyReplVisual",
+        line     = "<plug>kittyReplLine",
+        visual   = "<plug>kittyReplVisual",
         operator = "<plug>kittyRepl",
-        win = "<plug>kittyReplWin",
+        win      = "<plug>kittyReplWin",
+        focus    = "<plug>kittyReplFocus",
+        set      = "<plug>kittyReplSet",
+        setlast  = "<plug>kittyReplSetLast",
     },
     exclude = {
         TelescopePrompt=true, -- redundant since buftype is prompt.
@@ -253,12 +259,17 @@ function setup(conf)
             if vim.bo.buftype ~= "" then return end 
             if conf.exclude[vim.bo.filetype] then return end
 
-            print(vim.bo.buftype)
-            opts = {noremap=true, silent=true, buffer=true}
-            keymap.set('n', conf.keymap.line, kittySendLine, opts)
-            keymap.set('x', conf.keymap.visual, kittySendVisual, opts)
-            keymap.set('n', conf.keymap.operator, "Operator('v:lua.ReplOperator')", {expr=true, silent=true, buffer=true})
-            keymap.set('n', conf.keymap.win, kittyWindow, opts)
+            function opts(desc)
+                return {buffer=true, silent=true, desc=desc}
+            end
+            
+            keymap.set('n', conf.keymap.line, ReplSendLine, opts("REPL send line"))
+            keymap.set('x', conf.keymap.visual, ReplSendVisual, opts("REPL send visual"))
+            keymap.set('n', conf.keymap.operator, "Operator('v:lua.ReplOperator')", {buffer=true, silent=true, expr=true, desc="REPL send"})
+            keymap.set('n', conf.keymap.win, ReplWindow, opts("REPL new"))
+            keymap.set('n', conf.keymap.focus, ReplFocus, opts("REPL focus"))
+            keymap.set('n', conf.keymap.set, ReplSet, opts("REPL set"))
+            keymap.set('n', conf.keymap.setlast, ReplSetLast, opts("REPL set last"))
         end
     })
 end
