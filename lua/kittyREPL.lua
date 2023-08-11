@@ -131,12 +131,14 @@ local filetype2command = {
 
 function ReplWindow()
     -- default to zsh
-    ftcommand = filetype2command[vim.bo.filetype] or ""
-    fh = io.popen('kitty @ launch --cwd=current --keep-focus ' .. ftcommand)
-    window_id = fh:read("*n") -- *n means read number, which means we also strip newline
+    local ftcommand = filetype2command[vim.bo.filetype] or ""
+    local fh = io.popen('kitty @ launch --cwd=current --keep-focus ' .. ftcommand)
+    local window_id = fh:read("*n") -- *n means read number, which means we also strip newline
     fh:close()
-    -- set title to the id so we can easily set is as target
-    os.execute("kitty @ set-window-title --match id:" .. window_id .. " " .. window_id)
+    -- show id in the title so we can easily set is as target, but also start 
+    -- with the cmd like it would have been named by if opened in a regular way.
+    local title = ftcommand:match("[^ ]+") .. " id=" .. window_id
+    os.execute("kitty @ set-window-title --match id:" .. window_id .. " " .. title)
     set_repl(window_id)
 end
 
