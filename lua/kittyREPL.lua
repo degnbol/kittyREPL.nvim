@@ -280,15 +280,8 @@ local defaults = {
 }
 
 function setup(conf)
-    -- set defaults
-    conf = conf or defaults
-    conf.keymap = conf.keymap or defaults.keymap
-    for key, default in pairs(defaults.keymap) do
-        conf.keymap[key] = conf.keymap[key] or default
-    end
-    conf.exclude = conf.exclude or defaults.exclude
-    for key, default in pairs(defaults.exclude) do
-        conf.exclude[key] = conf.exclude[key] or default
+    if conf == nil then conf = defaults else
+        conf = vim.tbl_deep_extend("keep", conf, defaults)
     end
     
     local group = vim.api.nvim_create_augroup("kittyRepl", {clear=true})
