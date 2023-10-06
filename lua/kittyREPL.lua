@@ -177,28 +177,27 @@ local function ROOT()
     return debug.getinfo(1).source:match("@?(.*/)") .. '/..'
 end
 
-function kittySendBracketed(text)
+function kittySendBracketed(text, post)
     -- bracketedPaste.sh uses zsh to do bracketed paste cat from stdin to stdout.
     -- easiest to use stdin rather than putting the text as an arg due to worrying about escaping characters
-    fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. vim.b.repl_id, 'w')
+    fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. vim.b.repl_id .. ' ' .. post, 'w')
     fh:write(text)
     fh:close()
 end
 
-function kittySend(text)
+function kittySend(text, post)
     if filetype2bracketed[vim.bo.filetype] then
-        kittySendBracketed(text)
+        kittySendBracketed(text, post)
     else
-        kittySendRaw(text)
+        kittySendRaw(text .. post)
     end
 end
 
 local function kittyRun(text)
-    if text:sub(-1, -2) ~= '\n' then text = text .. '\n' end
-    kittySend(text)
+    kittySend(text, '"\n"')
 end
 local function kittyPaste(text)
-    kittySend(text:gsub('\n$', ''))
+    kittySend(text:gsub('\n$', ''), "")
 end
 
 function ReplRunLine()
