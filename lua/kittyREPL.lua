@@ -26,6 +26,10 @@ local cmdline2filetype = {
     radian="r",
 }
 
+-- help prefix by language, e.g. "?"
+-- julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
+local helpPrefix = { julia="@help " }
+
 function get_repl()
     return vim.b.repl_id
 end
@@ -132,7 +136,8 @@ function search_repl()
     end
 end
 
-function ReplWindow()
+--- Launch a new REPL window
+function ReplNew()
     -- default to zsh
     local ftcommand = filetype2command[vim.bo.filetype] or ""
     local fh = io.popen('kitty @ launch --cwd=current --keep-focus ' .. ftcommand)
@@ -156,10 +161,25 @@ function replCheck()
     return get_repl() ~= nil and kittyExists(get_repl()) or search_repl() ~= nil
 end
 
-function kittySendRaw(text)
+local function kittySendRaw(text)
     fh = io.popen('kitty @ send-text --stdin --match id:' .. vim.b.repl_id, 'w')
     fh:write(text)
     fh:close()
+end
+--- Make a function to send given text when called.
+function kittySendCustom(text)
+    return function ()
+        if not replCheck() then print("No REPL") else
+            kittySendRaw(text)
+        end
+    end
+end
+
+--- Send a SIGINT to the REPL.
+local function kittyInterrupt()
+    if not replCheck() then print("No REPL") else
+        return os.execute('kitty @ signal-child --match id:' .. vim.b.repl_id)
+    end
 end
 
 --- Fixes indentation by prepending Start Of Header signal.
@@ -180,7 +200,7 @@ end
 function kittySendBracketed(text, post)
     -- bracketedPaste.sh uses zsh to do bracketed paste cat from stdin to stdout.
     -- easiest to use stdin rather than putting the text as an arg due to worrying about escaping characters
-    fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. vim.b.repl_id .. ' ' .. post, 'w')
+    fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. vim.b.repl_id .. ' "' .. post ..'"', 'w')
     fh:write(text)
     fh:close()
 end
@@ -194,12 +214,18 @@ function kittySend(text, post)
 end
 
 local function kittyRun(text)
-    kittySend(text, '"\n"')
+    kittySend(text, '\n')
 end
 local function kittyPaste(text)
     kittySend(text:gsub('\n$', ''), "")
 end
 
+function ReplHelp()
+    if not replCheck() then print("No REPL") else
+        prefix = helpPrefix[vim.bo.filetype] or "?"
+        kittySendRaw(prefix .. vim.fn.expand("<cword>") .. "\n")
+    end
+end
 function ReplRunLine()
     if not replCheck() then print("No REPL") else
         kittyRun(api.nvim_get_current_line())
@@ -262,16 +288,21 @@ end
 
 local defaults = {
     keymap = {
+        new           = "<plug>kittyReplNew",
+        focus         = "<plug>kittyReplFocus",
+        set           = "<plug>kittyReplSet",
+        setlast       = "<plug>kittyReplSetLast",
         run           = "<plug>kittyReplRun",
         paste         = "<plug>kittyReplPaste",
+        help          = "<plug>kittyReplHelp",
         runLine       = "<plug>kittyReplRunLine",
         pasteLine     = "<plug>kittyReplPasteLine",
         runVisual     = "<plug>kittyReplRunVisual",
         pasteVisual   = "<plug>kittyReplPasteVisual",
-        win           = "<plug>kittyReplWin",
-        focus         = "<plug>kittyReplFocus",
-        set           = "<plug>kittyReplSet",
-        setlast       = "<plug>kittyReplSetLast",
+        q             = "<plug>kittyReplQ",
+        ctrld         = "<plug>kittyReplCtrld",
+        ctrlc         = "<plug>kittyReplCtrlc",
+        interrupt     = "<plug>kittyReplInterrupt",
     },
     exclude = {
         TelescopePrompt=true, -- redundant since buftype is prompt.
@@ -296,16 +327,21 @@ function setup(conf)
                 return {buffer=true, silent=true, desc=desc}
             end
             
+            keymap.set('n', conf.keymap.new, ReplNew, opts("REPL new"))
+            keymap.set('n', conf.keymap.focus, ReplFocus, opts("REPL focus"))
+            keymap.set('n', conf.keymap.set, ReplSet, opts("REPL set"))
+            keymap.set('n', conf.keymap.setlast, ReplSetLast, opts("REPL set last"))
             keymap.set('n', conf.keymap.run, "Operator('v:lua.ReplRunOperator')", {buffer=true, silent=true, expr=true, desc="REPL run motion"})
             keymap.set('n', conf.keymap.paste, "Operator('v:lua.ReplPasteOperator')", {buffer=true, silent=true, expr=true, desc="REPL paste motion"})
+            keymap.set('n', conf.keymap.help, ReplHelp, opts("REPL help word under cursor"))
             keymap.set('n', conf.keymap.runLine, ReplRunLine, opts("REPL run line"))
             keymap.set('n', conf.keymap.pasteLine, ReplPasteLine, opts("REPL paste line"))
             keymap.set('x', conf.keymap.runVisual, ReplRunVisual, opts("REPL run visual"))
             keymap.set('x', conf.keymap.pasteVisual, ReplPasteVisual, opts("REPL paste visual"))
-            keymap.set('n', conf.keymap.win, ReplWindow, opts("REPL new"))
-            keymap.set('n', conf.keymap.focus, ReplFocus, opts("REPL focus"))
-            keymap.set('n', conf.keymap.set, ReplSet, opts("REPL set"))
-            keymap.set('n', conf.keymap.setlast, ReplSetLast, opts("REPL set last"))
+            keymap.set('n', conf.keymap.q, kittySendCustom("q"), opts("REPL send q"))
+            keymap.set('n', conf.keymap.ctrld, kittySendCustom("\x04"), opts("REPL send Ctrl+d"))
+            keymap.set('n', conf.keymap.ctrlc, kittySendCustom("\x03"), opts("REPL send Ctrl+c"))
+            keymap.set('n', conf.keymap.interrupt, kittyInterrupt, opts("REPL interrupt"))
         end
     })
 end
