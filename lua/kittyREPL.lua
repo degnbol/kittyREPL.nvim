@@ -28,7 +28,7 @@ local cmdline2filetype = {
 
 -- help prefix by language, e.g. "?"
 -- julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
-local helpPrefix = { julia="@help " }
+local helpPrefix = { julia="@help ", r="?", python="?" }
 
 function get_repl()
     return vim.b.repl_id
@@ -76,7 +76,7 @@ function ReplSet()
 end
 
 -- set REPL window id to the last active window
-function ReplSetLast()
+local function ReplSetLast()
     hist = get_focused_tab()["active_window_history"]
     set_repl(hist[#hist])
 end
@@ -220,25 +220,33 @@ local function kittyPaste(text)
     kittySend(text:gsub('\n$', ''), "")
 end
 
-function ReplHelp()
+local function ReplHelp()
     if not replCheck() then print("No REPL") else
         prefix = helpPrefix[vim.bo.filetype] or "?"
         kittySendRaw(prefix .. vim.fn.expand("<cword>") .. "\n")
     end
 end
-function ReplRunLine()
+local function ReplHelpVisual()
+    if not replCheck() then print("No REPL") else
+        prefix = helpPrefix[vim.bo.filetype] or "?"
+        cmd 'silent normal! "ky`>'
+        kittySendRaw(prefix .. fn.getreg('k') .. "\n")
+    end
+end
+
+local function ReplRunLine()
     if not replCheck() then print("No REPL") else
         kittyRun(api.nvim_get_current_line())
         cmd 'silent normal! j'
     end
 end
-function ReplPasteLine()
+local function ReplPasteLine()
     if not replCheck() then print("No REPL") else
         kittyPaste(api.nvim_get_current_line())
     end
 end
 
-function ReplRunVisual()
+local function ReplRunVisual()
     if not replCheck() then print("No REPL") else
         -- NOTE: old nvim versions needed gv to first reselect last select.
         -- "ky = yank to register k (k for kitty)
@@ -247,7 +255,7 @@ function ReplRunVisual()
         kittyRun(fn.getreg('k'))
     end
 end
-function ReplPasteVisual()
+local function ReplPasteVisual()
     if not replCheck() then print("No REPL") else
         -- NOTE: old nvim versions needed gv to first reselect last select.
         -- "ky = yank to register k (k for kitty)
@@ -334,6 +342,7 @@ function setup(conf)
             keymap.set('n', conf.keymap.run, "Operator('v:lua.ReplRunOperator')", {buffer=true, silent=true, expr=true, desc="REPL run motion"})
             keymap.set('n', conf.keymap.paste, "Operator('v:lua.ReplPasteOperator')", {buffer=true, silent=true, expr=true, desc="REPL paste motion"})
             keymap.set('n', conf.keymap.help, ReplHelp, opts("REPL help word under cursor"))
+            keymap.set('x', conf.keymap.help, ReplHelpVisual, opts("REPL help visual"))
             keymap.set('n', conf.keymap.runLine, ReplRunLine, opts("REPL run line"))
             keymap.set('n', conf.keymap.pasteLine, ReplPasteLine, opts("REPL paste line"))
             keymap.set('x', conf.keymap.runVisual, ReplRunVisual, opts("REPL run visual"))
