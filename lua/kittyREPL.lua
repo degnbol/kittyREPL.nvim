@@ -5,6 +5,15 @@ local api = vim.api
 local fn = vim.fn
 local keymap = vim.keymap
 
+-- TODO: use function rather than string after pull request is merged:
+-- https://github.com/neovim/neovim/pull/20187
+local function operator(funcname)
+    return function ()
+        vim.opt.operatorfunc = "v:lua." .. funcname
+        return "g@"
+    end
+end
+
 -- not all REPLs support bracketed paste
 local filetype2bracketed = { python=true, r=true, julia=true }
 
@@ -339,8 +348,8 @@ function setup(conf)
             keymap.set('n', conf.keymap.focus, ReplFocus, opts("REPL focus"))
             keymap.set('n', conf.keymap.set, ReplSet, opts("REPL set"))
             keymap.set('n', conf.keymap.setlast, ReplSetLast, opts("REPL set last"))
-            keymap.set('n', conf.keymap.run, "Operator('v:lua.ReplRunOperator')", {buffer=true, silent=true, expr=true, desc="REPL run motion"})
-            keymap.set('n', conf.keymap.paste, "Operator('v:lua.ReplPasteOperator')", {buffer=true, silent=true, expr=true, desc="REPL paste motion"})
+            keymap.set('n', conf.keymap.run, operator("ReplRunOperator"), {buffer=true, silent=true, expr=true, desc="REPL run motion"})
+            keymap.set('n', conf.keymap.paste, operator("ReplPasteOperator"), {buffer=true, silent=true, expr=true, desc="REPL paste motion"})
             keymap.set('n', conf.keymap.help, ReplHelp, opts("REPL help word under cursor"))
             keymap.set('x', conf.keymap.help, ReplHelpVisual, opts("REPL help visual"))
             keymap.set('n', conf.keymap.runLine, ReplRunLine, opts("REPL run line"))
