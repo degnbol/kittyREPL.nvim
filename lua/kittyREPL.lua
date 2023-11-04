@@ -37,6 +37,7 @@ local config = {
     },
     progress = true, -- should the cursor progress after a command is run?
     editpaste = false, -- should we immidiately go to REPL when pasting?
+    closepager = false, -- autoclose pager if open when running/pasting
 }
 
 
@@ -72,7 +73,12 @@ local cmdline2filetype = {
 
 -- help prefix by language, e.g. "?"
 -- julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
-local helpPrefix = { julia="@help ", r="?", python="?" }
+-- If table then the key of each entry will be matched from first to last entry.
+local helpPrefix = {
+    julia={["pager??>"]="", ["pager>"]="?", ["help??>"]="", [">"]="@help "},
+    r="?",
+    python="?", -- ipython
+}
 
 -- patterns to match for prompt start and continuation for each supported REPL program
 local prompts = {
@@ -267,6 +273,9 @@ function kittySendBracketed(text, post)
 end
 
 function kittySend(text, post)
+    if config.closepager and replDetectPager() then
+        kittySendRaw("q")
+    end
     if filetype2bracketed[vim.bo.filetype] then
         kittySendBracketed(text, post)
     else
@@ -282,19 +291,6 @@ local function kittyPaste(text)
     if config.editpaste then ReplFocus() end
 end
 
-local function ReplHelp()
-    prefix = helpPrefix[vim.bo.filetype] or "?"
-    kittySendRaw(prefix .. vim.fn.expand("<cword>") .. "\n")
-end
-local function ReplHelpVisual()
-    prefix = helpPrefix[vim.bo.filetype] or "?"
-    cmd 'silent normal! "ky'
-    kittySendRaw(prefix .. fn.getreg('k') .. "\n")
-    if config.progress then
-        cmd 'silent normal! `>'
-    end
-end
-
 local function ReplRunLine()
     kittyRun(api.nvim_get_current_line())
     if config.progress then
@@ -303,6 +299,9 @@ local function ReplRunLine()
 end
 local function ReplPasteLine()
     kittyPaste(api.nvim_get_current_line())
+    if config.progress then
+        cmd 'silent normal! j'
+    end
 end
 
 local function ReplRunVisual()
@@ -363,21 +362,21 @@ local function readScrollback()
     iScrollback = 0
 end
 
--- parse one command entry from the scrollback text and truncate the text afterwards.
--- Returns: the new parsed command, as array of lines
+---Parse one command entry from the scrollback text and truncate the text afterwards.
+---@return string: the matched prompt string
+---@return table: the new parsed command, as array of lines
 local function parseScrollback()
-    local prompt, promptCont = unpack(prompts[b.repl_cmd])
+    local pat, patCont = unpack(prompts[b.repl_cmd])
     local lines = {}
     while true do
-        newline = scrollback:match("()\n[^\n]*$")
-        if newline == nil then break end
-        lastline = scrollback:sub(newline+1, #scrollback)
-        scrollback = scrollback:sub(1, newline-1)
-        local mPrompt = lastline:match(prompt)
+        lastline = scrollback:match("\n([^\n]*)$")
+        if lastline == nil then return end
+        scrollback = scrollback:sub(1, #scrollback - #lastline - 1)
+        local mPrompt = lastline:match(pat)
         if mPrompt ~= nil then
             rcmd = {lastline:sub(mPrompt)}
             for i, line in ipairs(lines) do
-                local mPromptCont = line:match(promptCont)
+                local mPromptCont = line:match(patCont)
                 if mPromptCont ~= nil then
                     table.insert(rcmd, line:sub(mPromptCont))
                 else
@@ -401,6 +400,7 @@ local function scroll(delta)
     if delta > 0 then
         for i = 1, delta do
             if iScrollback == #tScrollback then
+                -- skip empty prompts
                 rcmd = {""}
                 while table.concat(rcmd) == "" do
                     rcmd = parseScrollback()
@@ -450,6 +450,60 @@ local function replaceScroll(delta)
         end
     end
 end
+
+---Detect whether the REPL is currently displaying a pager, e.g. help texts.
+---@return boolean
+function replDetectPager()
+    fh = io.popen('kitty @ get-text --extent=screen --add-cursor --match id:' .. b.repl_id)
+    local scrollback = vim.split(fh:read("*a"), '\n')
+    -- remove empty string at the end due to final newline char
+    table.remove(scrollback, #scrollback)
+    fh:close()
+    lastline = scrollback[#scrollback]
+    -- does the last line start with a colon and some whitespace?
+    local colon = lastline:match("^:%s+")
+    if colon == nil then return false end
+    -- as a second measure we also check that the cursor is placed right after the colon
+    local r, c = lastline:match("%c+%[??25h%c%[(%d+);(%d+)H%c+%[??12h")
+    return tonumber(r) == #scrollback and tonumber(c) == 2
+end
+
+
+
+function replHelpPrefix()
+    local prefix = helpPrefix[vim.bo.filetype] or "?"
+    if type(prefix) ~= "table" then return prefix end
+    readScrollback()
+    while true do
+        lastline = scrollback:match("\n([^\n]*)$")
+        if lastline == nil then return end
+        scrollback = scrollback:sub(1, #scrollback - #lastline - 1)
+        for pat, pre in pairs(prefix) do
+            if lastline:match(pat) then
+                return pre
+            end
+        end
+    end
+    return "?"
+end
+
+local function ReplHelp()
+    if config.closepager and replDetectPager() then
+        kittySendRaw("q")
+    end
+    kittySendRaw(replHelpPrefix() .. vim.fn.expand("<cword>") .. "\n")
+end
+local function ReplHelpVisual()
+    if config.closepager and replDetectPager() then
+        kittySendRaw("q")
+    end
+    cmd 'silent normal! "ky'
+    kittySendRaw(replHelpPrefix() .. fn.getreg('k') .. "\n")
+    if config.progress then
+        cmd 'silent normal! `>'
+    end
+end
+
 
 function setup(userconfig)
     -- TODO: check if term is kitty
