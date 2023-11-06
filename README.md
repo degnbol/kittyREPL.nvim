@@ -82,5 +82,4 @@ No keys are bound by default. Example install and config with lazy.nvim:
         },
     },
 },
-    ```
-
+```
