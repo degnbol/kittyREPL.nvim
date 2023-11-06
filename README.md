@@ -38,8 +38,49 @@ No keys are bound by default. Example install and config with lazy.nvim:
         progress = true, -- cursor progresses after sending to REPL
         editpaste = true, -- focus the REPL right after pasting to it
         closepager = true, -- default=false
+        -- not all REPLs support bracketed paste
+        bracketed = { python=true, r=true, julia=true },
+        command = { -- command to execute in new kitty window
+            python="ipython",
+            julia="julia",
+            -- kitty command doesn't know where R is since it doesn't have all the env copied.
+                r="radian --r-binary /Library/Frameworks/R.framework/Resources/R",
+            lua="lua",
+        },
+        match = { -- language specific matching
+            -- kitty @ ls foreground_processes cmdline value to recognize.
+            -- Key is literal match string, value is corresponding language.
+            cmdline = {
+                python3="python",
+                ipython="python",
+                IPython="python",
+                R="r",
+                radian="r",
+            },
+            prompt = { -- patterns to match for prompt start and continuation for each supported REPL program
+                -- this will not understand pkg prompts on the form (ENV) pkg>
+                -- This should be fine for grabbing cmd inputs but not for grabbing 
+                -- outputs, if we were to want that. A solution would be a table of patterns, with a second pkg pattern.
+                julia = {"%a*%??> ", "  "},
+                radian = {"> ", "  "},
+                r = {"> ", "+ "},
+                python = {">>> ", "... "},
+                ipython = {"In %[%d+%]: ", " +...: "},
+                zsh = {"❯ ", "%a*> "}, -- e.g. for>
+                sh = {"❯ ", "%a*> "},
+                bash = {"[%w.-]*$ ", "> "},
+                lua = {"> ", ">> "},
+            },
+            -- help prefix by language, e.g. "?"
+            -- julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
+            -- If table then the key of each entry will be matched from first to last entry.
+            help = {
+                julia={["pager??>"]="", ["pager>"]="?", ["help??>"]="", [">"]="@help "},
+                r="?",
+                python="?", -- ipython
+            },
+        },
     },
 },
-```
-```
-```
+    ```
+
