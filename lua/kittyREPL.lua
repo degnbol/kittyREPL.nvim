@@ -209,7 +209,7 @@ function kittySend(text, post, raw)
     if config.closepager and replDetectPager() then
         kittySendRaw("q")
     end
-    if not raw and filetype2bracketed[vim.bo.filetype] then
+    if not raw and config.bracketed[vim.bo.filetype] then
         kittySendBracketed(text, post)
     else
         kittySendRaw(text .. post)
