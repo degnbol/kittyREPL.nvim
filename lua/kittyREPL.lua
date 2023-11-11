@@ -82,13 +82,16 @@ local config = {
             bash = {"[%w.-]*$ ", "> "},
             lua = {"> ", ">> "},
         },
-        -- help prefix by language, e.g. "?"
-        -- julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
-        -- If table then the key of each entry will be matched from first to last entry.
+        -- Help command by REPL command and context, often a "?" prefix.
+        -- For each REPL command provide either a help command prefix string, a two element array with prefix and suffix, 
+        -- or a key-value table where each key will be matched against the last prompt (from first to last key).
+        -- E.g. julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
         help = {
+            -- TODO: this shouldn't be default as it assumes TerminalPager is installed.
             julia={["pager??>"]="", ["pager>"]="?", ["help??>"]="", [">"]="@help "},
-            r="?",
-            python="?", -- ipython
+            radian="?", r="?",
+            ipython="?", python={"help(", ")"},
+            lua="", -- no help available
         },
     },
 }
@@ -376,39 +379,52 @@ end
 ---@return boolean
 function replDetectPager()
     fh = io.popen('kitty @ get-text --extent=screen --add-cursor --match id:' .. b.repl_id)
-    local scrollback = vim.split(fh:read("*a"), '\n')
-    -- remove empty string at the end due to final newline char
-    table.remove(scrollback, #scrollback)
+    local scrollback = fh:read("*a")
     fh:close()
-    lastline = scrollback[#scrollback]
-    -- does the last line start with a colon and some whitespace?
-    local colon = lastline:match("^:%s+")
-    if colon == nil then return false end
-    -- as a second measure we also check that the cursor is placed right after the colon.
+    -- Get cursor position to check if it is placed right after a pager pattern to match.
     -- Lua pattern explanation:
-    -- Matched pattern is ^[[n;mH
-    -- where ^[ is ESC, n is an integer indicating cursor row and m indicates cursor column. Both 1-indexed.
+    -- Matched pattern is ^[[?25h^[[n;mH^[[?12h where
+    -- ^[ is ESC and ^[[ is known as CSI (Control Sequence Introducer)
+    -- n is an integer indicating cursor row and m indicates cursor column. Both 1-indexed.
+    -- ^[[?25h means "show the cursor". I don't know what ^[[?12h does.
     -- https://en.wikipedia.org/wiki/ANSI_escape_code
-    local r, c = lastline:match("%c%[(%d+);(%d+)H")
-    return tonumber(r) == #scrollback and tonumber(c) == 2
+    local helplines, lastline, blanklines, r, c = scrollback:match("(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
+    -- does the last line start with a colon and then the cursor or does the last nonempty line start with (END) and then the cursor?
+    pagerMatch = lastline:match("^(:)")
+    if pagerMatch and #blanklines > 0 then return false end
+    if not pagerMatch then pagerMatch = lastline:match("^%(END%)") end
+    if not pagerMatch then return false end
+    _, nlines = helplines:gsub('\n', '')
+    -- +2 since "lines" doesn't contain "lastline" and the newline right before it.
+    -- NOTE: The pattern doesn't work if that newline gets included.
+    return tonumber(r) == nlines+2 and tonumber(c) == #pagerMatch + 1
 end
 
 ---Get the help command needed to prefix a help search term for the current language.
----@return string: Prefix string for command to run in REPL to get help for a given query.
-function replHelpPrefix()
-    local prefix = config.match.help[vim.bo.filetype] or "?"
+---@param query string
+---@return string: string cmd to run in REPL to get help for a given query.
+function replHelpCmd(query)
+    local helpCmd = config.match.help[vim.bo.filetype] or "?"
     -- if the config.match.help entry for a language is a table, then it means 
     -- we need to look for the current REPL prompt context to understand which 
     -- prefix is appropriate.
-    if type(prefix) ~= "table" then return prefix end
+    if type(helpCmd) ~= "table" then return helpCmd .. query end
+    if vim.tbl_islist(helpCmd) and #helpCmd == 2 then
+        return helpCmd[1] .. query .. helpCmd[2]
+    end
+    -- otherwise key-value dict
     readScrollback()
     while true do
         lastline = scrollback:match("\n([^\n]*)$")
         if lastline == nil then return end
         scrollback = scrollback:sub(1, #scrollback - #lastline - 1)
-        for pat, pre in pairs(prefix) do
+        for pat, _helpCmd in pairs(helpCmd) do
             if lastline:match(pat) then
-                return pre
+                if type(helpCmd) == "table" then
+                    return _helpCmd[1] .. query .. _helpCmd[2]
+                else
+                    return _helpCmd .. query
+                end
             end
         end
     end
@@ -449,8 +465,9 @@ local function ReplSetLast()
     end
 end
 local function ReplRunLine()
-    count = vim.v.count or 1
+    local count = vim.v.count > 0 and vim.v.count or 1
     for _ = 1, count do
+        print("hej")
         kittyRun(vim.api.nvim_get_current_line(), true)
         if config.progress then
             cmd 'silent normal! j'
@@ -458,7 +475,7 @@ local function ReplRunLine()
     end
 end
 local function ReplPasteLine()
-    count = vim.v.count or 1
+    local count = vim.v.count > 0 and vim.v.count or 1
     for _ = 1, count do
         kittyPaste(vim.api.nvim_get_current_line(), true)
         if config.progress then
@@ -509,11 +526,11 @@ function ReplPasteOperator(type, ...)
     end
 end
 local function ReplHelp()
-    kittyRun(replHelpPrefix() .. fn.expand("<cword>"), true)
+    kittyRun(replHelpCmd(fn.expand("<cword>")), true)
 end
 local function ReplHelpVisual()
     cmd 'silent normal! "ky'
-    kittyRun(replHelpPrefix() .. fn.getreg('k'), true)
+    kittyRun(replHelpCmd(fn.getreg('k')), true)
     if config.progress then
         cmd 'silent normal! `>'
     end
