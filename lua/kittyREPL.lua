@@ -376,6 +376,7 @@ local function scroll(delta)
 end
 
 ---Detect whether the REPL is currently displaying a pager, e.g. help texts.
+---Does the last line start with a colon and then the cursor or does the last nonempty line start with (END) and then the cursor?
 ---@return boolean
 function replDetectPager()
     fh = io.popen('kitty @ get-text --extent=screen --add-cursor --match id:' .. b.repl_id)
@@ -389,7 +390,8 @@ function replDetectPager()
     -- ^[[?25h means "show the cursor". I don't know what ^[[?12h does.
     -- https://en.wikipedia.org/wiki/ANSI_escape_code
     local helplines, lastline, blanklines, r, c = scrollback:match("(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
-    -- does the last line start with a colon and then the cursor or does the last nonempty line start with (END) and then the cursor?
+    -- if we aren't scrolled to the bottom lastline will be nil.
+    if lastline == nil then return false end
     pagerMatch = lastline:match("^(:)")
     if pagerMatch and #blanklines > 0 then return false end
     if not pagerMatch then pagerMatch = lastline:match("^%(END%)") end
@@ -467,7 +469,6 @@ end
 local function ReplRunLine()
     local count = vim.v.count > 0 and vim.v.count or 1
     for _ = 1, count do
-        print("hej")
         kittyRun(vim.api.nvim_get_current_line(), true)
         if config.progress then
             cmd 'silent normal! j'
