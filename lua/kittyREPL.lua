@@ -5,6 +5,7 @@ local cmd = vim.cmd
 local fn = vim.fn
 
 local config = {
+    -- Set keymaps in setup call or map something to these <plug> maps.
     keymap = {
         new           = "<plug>kittyReplNew",
         focus         = "<plug>kittyReplFocus",
@@ -28,6 +29,7 @@ local config = {
         progress      = "<plug>kittyReplToggleProgress",
         editPaste     = "<plug>kittyReplToggleEditPaste",
     },
+    -- Disable plugin for these filetypes:
     exclude = {
         TelescopePrompt=true, -- redundant since buftype is prompt.
         oil=true,
@@ -35,9 +37,18 @@ local config = {
     progress = true, -- should the cursor progress after a command is run?
     editpaste = false, -- should we immidiately go to REPL when pasting?
     closepager = false, -- autoclose pager if open when running/pasting
-    -- not all REPLs support bracketed paste
-    bracketed = { python=true, r=true, julia=true },
-    -- command to execute in new kitty window
+    -- not all REPLs support bracketed paste.
+    -- stock python repl is particularly bad. It doesn't support bracketed, it 
+    -- can't handle empty line within indentation, it doesn't understand the 
+    -- SOH code.
+    bracketed = { ipython=true, python=false, radian=true, r=false, julia=true },
+    -- Stock python REPL writes "..." too slow when running multiple lines.
+    -- This "linewise" config enables splitting multiline messages by newlines 
+    -- and sends them one at a time. Still skipping empty newlines or adding 
+    -- whitespace to them.
+    linewise = { python=true, },
+    -- command to execute in new kitty window.
+    -- TODO: add fallback and don't assume MacOS.
     command = {
         python="ipython",
         julia="julia",
@@ -83,7 +94,7 @@ local config = {
 }
 
 
--- TODO: use function rather than string after pull request is merged:
+-- LATER: use function rather than string after pull request is merged:
 -- https://github.com/neovim/neovim/pull/20187
 local function operator(funcname)
     return function ()
@@ -92,18 +103,37 @@ local function operator(funcname)
     end
 end
 
-local function get_focused_tab()
+local function kitty_ls()
     fh = io.popen('kitty @ ls 2> /dev/null')
     json_string = fh:read("*a")
     fh:close()
     -- if we are not in fact in a kitty terminal then the command will fail
     if json_string == "" then return end
-    ls = vim.json.decode(json_string)
+    return vim.json.decode(json_string)
+end
+
+local function get_focused_tab()
+    ls = kitty_ls()
+    if ls == nil then return end
     for i_os_win, os_win in ipairs(ls) do
         if os_win.is_focused then
             for i_tab, tab in ipairs(os_win.tabs) do
                 if tab.is_focused then
                     return tab
+                end
+            end
+        end
+    end   
+end
+
+local function get_repl_win()
+    ls = kitty_ls()
+    if ls == nil then return end
+    for i_os_win, os_win in ipairs(ls) do
+        for i_tab, tab in ipairs(os_win.tabs) do
+            for _, win in ipairs(tab.windows) do
+                if win.id == vim.b.repl_id then
+                    return win
                 end
             end
         end
@@ -160,6 +190,25 @@ function search_repl()
     end
 end
 
+function search_replcmd()
+    local win = get_repl_win()
+    procs = win.foreground_processes
+    cmdline = procs[#procs].cmdline
+    for _, arg in ipairs(cmdline) do
+        cmdname = string.match(arg, "[%w.]+$")
+        if config.match.cmdline[cmdname] then
+            b.repl_cmd = cmdname:lower()
+            return b.repl_cmd
+        end
+    end
+    for cmdname in string.gmatch(win.title, "[%w]+") do
+        if config.match.cmdline[cmdname] then
+            b.repl_cmd = cmdname:lower()
+            return b.repl_cmd
+        end
+    end
+end
+
 function kittyExists(window_id)
     -- see if kitty window exists by getting text from it and checking if the operation fails (nonzero exit code).
     return os.execute('kitty @ get-text --match id:' .. window_id .. ' > /dev/null 2> /dev/null') == 0
@@ -174,6 +223,11 @@ function replCheck(f)
             print("No REPL")
         end
     end
+end
+
+-- change kitty focus from editor to REPL
+local function ReplFocus()
+    os.execute('kitty @ focus-window --match id:' .. b.repl_id)
 end
 
 local function kittySendRaw(text)
@@ -209,10 +263,25 @@ function kittySend(text, post, raw)
     if config.closepager and replDetectPager() then
         kittySendRaw("q")
     end
-    if not raw and config.bracketed[vim.bo.filetype] then
-        kittySendBracketed(text, post)
-    else
+    if raw then
         kittySendRaw(text .. post)
+    else
+        if config.bracketed[vim.b.repl_cmd] then
+            kittySendBracketed(text, post)
+        elseif config.linewise[vim.b.repl_cmd] then
+            for i, line in ipairs(vim.split(text, '\n')) do
+                if line ~= "" then
+                    kittySendRaw(line .. '\n')
+                end
+            end
+            kittySendRaw(post)
+        else
+            -- mostly for python's sake, we could remove empty lines.
+            -- It would also work to add any amount of whitespace on the empty lines.
+            -- We use the linewise send above instead.
+            -- kittySendRaw(text:gsub('\n+', '\n') .. post)
+            kittySendRaw(text .. post)
+        end
     end
 end
 
@@ -362,10 +431,6 @@ function ReplNew()
     b.repl_id = window_id
     b.repl_cmd = ftcommand:match("[^ ]+"):lower()
 end
--- change kitty focus from editor to REPL
-local function ReplFocus()
-    os.execute('kitty @ focus-window --match id:' .. b.repl_id)
-end
 -- manually set repl as ith visible window from a prompt.
 -- Useful to have keybinding to this function.
 function ReplSetI()
@@ -378,19 +443,27 @@ end
 local function ReplSetLast()
     hist = get_focused_tab().active_window_history
     b.repl_id = hist[#hist]
-    -- TODO: detect from kitty @ ls instead
-    b.repl_cmd = vim.bo.filetype
+    if not search_replcmd() then
+        -- fallback
+        b.repl_cmd = vim.bo.filetype
+    end
 end
 local function ReplRunLine()
-    kittyRun(vim.api.nvim_get_current_line(), true)
-    if config.progress then
-        cmd 'silent normal! j'
+    count = vim.v.count or 1
+    for _ = 1, count do
+        kittyRun(vim.api.nvim_get_current_line(), true)
+        if config.progress then
+            cmd 'silent normal! j'
+        end
     end
 end
 local function ReplPasteLine()
-    kittyPaste(vim.api.nvim_get_current_line(), true)
-    if config.progress then
-        cmd 'silent normal! j'
+    count = vim.v.count or 1
+    for _ = 1, count do
+        kittyPaste(vim.api.nvim_get_current_line(), true)
+        if config.progress then
+            cmd 'silent normal! j'
+        end
     end
 end
 local function ReplRunVisual()
