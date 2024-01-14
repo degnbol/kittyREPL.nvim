@@ -15,6 +15,7 @@ local config = {
         paste         = "<plug>kittyReplPaste",
         help          = "<plug>kittyReplHelp",
         runLine       = "<plug>kittyReplRunLine",
+        runLineFor    = "<plug>kittyReplRunLineFor",
         pasteLine     = "<plug>kittyReplPasteLine",
         runVisual     = "<plug>kittyReplRunVisual",
         pasteVisual   = "<plug>kittyReplPasteVisual",
@@ -107,8 +108,8 @@ local function operator(funcname)
 end
 
 local function kitty_ls()
-    fh = io.popen('kitty @ ls 2> /dev/null')
-    json_string = fh:read("*a")
+    local fh = io.popen('kitty @ ls 2> /dev/null')
+    local json_string = fh:read("*a")
     fh:close()
     -- if we are not in fact in a kitty terminal then the command will fail
     if json_string == "" then return end
@@ -116,7 +117,7 @@ local function kitty_ls()
 end
 
 local function get_focused_tab()
-    ls = kitty_ls()
+    local ls = kitty_ls()
     if ls == nil then return end
     for i_os_win, os_win in ipairs(ls) do
         if os_win.is_focused then
@@ -130,7 +131,7 @@ local function get_focused_tab()
 end
 
 local function get_repl_win()
-    ls = kitty_ls()
+    local ls = kitty_ls()
     if ls == nil then return end
     for i_os_win, os_win in ipairs(ls) do
         for i_tab, tab in ipairs(os_win.tabs) do
@@ -158,8 +159,8 @@ function search_repl()
         -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`, 
         -- then PlotlyJS will open other processes that are listed earlier in the list. 
         -- If there are any problems then just loop and look in all foreground processes.
-        procs = win.foreground_processes
-        cmdline = procs[#procs].cmdline
+        local procs = win.foreground_processes
+        local cmdline = procs[#procs].cmdline
         -- example cmdline patterns:
         -- ["/usr/local/bin/julia", "-t", "4"] -> julia
         -- [".../R"] -> r
@@ -169,8 +170,8 @@ function search_repl()
         if cmdline[1] == "nvim" then goto continue end
         for _, arg in ipairs(cmdline) do
             -- match letters, numbers and period until the end of string arg.
-            cmdname = string.match(arg, "[%w.]+$")
-            repl = config.match.cmdline[cmdname] or cmdname
+            local cmdname = string.match(arg, "[%w.]+$")
+            local repl = config.match.cmdline[cmdname] or cmdname
             if repl == vim.bo.filetype then
                 b.repl_cmd = cmdname:lower()
                 b.repl_id = win.id
@@ -182,7 +183,7 @@ function search_repl()
         -- "IPython: ..." -> IPython
         -- "server-name: julia" -> julia
         for cmdname in string.gmatch(win.title, "[%w]+") do
-            repl = config.match.cmdline[cmdname] or cmdname
+            local repl = config.match.cmdline[cmdname] or cmdname
             if repl == vim.bo.filetype then
                 b.repl_cmd = cmdname:lower()
                 b.repl_id = win.id
@@ -195,10 +196,10 @@ end
 
 function search_replcmd()
     local win = get_repl_win()
-    procs = win.foreground_processes
-    cmdline = procs[#procs].cmdline
+    local procs = win.foreground_processes
+    local cmdline = procs[#procs].cmdline
     for _, arg in ipairs(cmdline) do
-        cmdname = string.match(arg, "[%w.]+$")
+        local cmdname = string.match(arg, "[%w.]+$")
         if config.match.cmdline[cmdname] then
             b.repl_cmd = cmdname:lower()
             return b.repl_cmd
@@ -234,7 +235,7 @@ local function ReplFocus()
 end
 
 local function kittySendRaw(text)
-    fh = io.popen('kitty @ send-text --stdin --match id:' .. b.repl_id, 'w')
+    local fh = io.popen('kitty @ send-text --stdin --match id:' .. b.repl_id, 'w')
     fh:write(text)
     fh:close()
 end
@@ -257,7 +258,7 @@ end
 function kittySendBracketed(text, post)
     -- bracketedPaste.sh uses zsh to do bracketed paste cat from stdin to stdout.
     -- easiest to use stdin rather than putting the text as an arg due to worrying about escaping characters
-    fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. b.repl_id .. ' "' .. post ..'"', 'w')
+    local fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. b.repl_id .. ' "' .. post ..'"', 'w')
     fh:write(text)
     fh:close()
 end
@@ -302,7 +303,7 @@ local iScrollback = 0
 
 -- read the raw scrollback text and reset parsing.
 local function readScrollback()
-    fh = io.popen('kitty @ get-text --extent=all --match id:' .. b.repl_id)
+    local fh = io.popen('kitty @ get-text --extent=all --match id:' .. b.repl_id)
     scrollback = fh:read("*a")
     fh:close()
     -- reset
@@ -317,12 +318,12 @@ local function parseScrollback()
     local pat, patCont = unpack(config.match.prompt[b.repl_cmd])
     local lines = {}
     while true do
-        lastline = scrollback:match("\n([^\n]*)$")
+        local lastline = scrollback:match("\n([^\n]*)$")
         if lastline == nil then return end
         scrollback = scrollback:sub(1, #scrollback - #lastline - 1)
         local mPrompt = lastline:match(pat)
         if mPrompt ~= nil then
-            rcmd = {lastline:sub(mPrompt)}
+            local rcmd = {lastline:sub(mPrompt)}
             for i, line in ipairs(lines) do
                 local mPromptCont = line:match(patCont)
                 if mPromptCont ~= nil then
@@ -349,7 +350,7 @@ local function scroll(delta)
         for i = 1, delta do
             if iScrollback == #tScrollback then
                 -- skip empty prompts
-                rcmd = {""}
+                local rcmd = {""}
                 while table.concat(rcmd) == "" do
                     rcmd = parseScrollback()
                     if rcmd == nil then
@@ -379,7 +380,7 @@ end
 ---Does the last line start with a colon and then the cursor or does the last nonempty line start with (END) and then the cursor?
 ---@return boolean
 function replDetectPager()
-    fh = io.popen('kitty @ get-text --extent=screen --add-cursor --match id:' .. b.repl_id)
+    local fh = io.popen('kitty @ get-text --extent=screen --add-cursor --match id:' .. b.repl_id)
     local scrollback = fh:read("*a")
     fh:close()
     -- Get cursor position to check if it is placed right after a pager pattern to match.
@@ -392,11 +393,11 @@ function replDetectPager()
     local helplines, lastline, blanklines, r, c = scrollback:match("(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
     -- if we aren't scrolled to the bottom lastline will be nil.
     if lastline == nil then return false end
-    pagerMatch = lastline:match("^(:)")
+    local pagerMatch = lastline:match("^(:)")
     if pagerMatch and #blanklines > 0 then return false end
     if not pagerMatch then pagerMatch = lastline:match("^%(END%)") end
     if not pagerMatch then return false end
-    _, nlines = helplines:gsub('\n', '')
+    local _, nlines = helplines:gsub('\n', '')
     -- +2 since "lines" doesn't contain "lastline" and the newline right before it.
     -- NOTE: The pattern doesn't work if that newline gets included.
     return tonumber(r) == nlines+2 and tonumber(c) == #pagerMatch + 1
@@ -433,6 +434,18 @@ function replHelpCmd(query)
     return "?"
 end
 
+-- Just Julia for now
+local function parseVariableIterable(line)
+    for _, pVar in ipairs({"%w+", "%b()"}) do
+        for _, pIter in ipairs({"%w+", "%b()", "%b[]"}) do
+            local variable, iterable = line:match("(" .. pVar .. ") in (" .. pIter .. ")")
+            if variable ~= nil then
+                return variable, iterable
+            end
+        end
+    end
+end
+
 -- Top level keybound commands.
 
 --- Launch a new REPL window
@@ -459,7 +472,7 @@ local function ReplSet()
 end
 -- set REPL window id to the last active window
 local function ReplSetLast()
-    hist = get_focused_tab().active_window_history
+    local hist = get_focused_tab().active_window_history
     b.repl_id = hist[#hist]
     if not search_replcmd() then
         -- fallback
@@ -482,6 +495,17 @@ local function ReplPasteLine()
         if config.progress then
             cmd 'silent normal! j'
         end
+    end
+end
+local function ReplRunLineFor()
+    local count = vim.v.count > 0 and vim.v.count or 1
+    -- TODO: language specific, right now test julia
+    local variable, iterable = parseVariableIterable(vim.api.nvim_get_current_line())
+    -- TODO: count used for not running first but later entry of iterable.
+    local torun = variable .. " = first(" .. iterable .. ")"
+    kittyRun(torun, true)
+    if config.progress then
+        cmd 'silent normal! j'
     end
 end
 local function ReplRunVisual()
@@ -569,7 +593,6 @@ function ReplToggleEditPaste()
     print("REPL edit paste =", config.editpaste)
 end
 
-
 function setup(userconfig)
     -- TODO: check if term is kitty
 
@@ -608,6 +631,7 @@ function setup(userconfig)
             map('n', c.keymap.help,        replCheck(ReplHelp),                      opts("REPL help word under cursor"))
             map('x', c.keymap.help,        replCheck(ReplHelpVisual),                opts("REPL help visual"))
             map('n', c.keymap.runLine,     replCheck(ReplRunLine),                   opts("REPL run line"))
+            map('n', c.keymap.runLineFor,  replCheck(ReplRunLineFor),                opts("REPL run for loop iteration"))
             map('n', c.keymap.pasteLine,   replCheck(ReplPasteLine),                 opts("REPL paste line"))
             map('x', c.keymap.runVisual,   replCheck(ReplRunVisual),                 opts("REPL run visual"))
             map('x', c.keymap.pasteVisual, replCheck(ReplPasteVisual),               opts("REPL paste visual"))
