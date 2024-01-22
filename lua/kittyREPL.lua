@@ -423,7 +423,7 @@ function replHelpCmd(query)
         scrollback = scrollback:sub(1, #scrollback - #lastline - 1)
         for pat, _helpCmd in pairs(helpCmd) do
             if lastline:match(pat) then
-                if type(helpCmd) == "table" then
+                if type(_helpCmd) == "table" then
                     return _helpCmd[1] .. query .. _helpCmd[2]
                 else
                     return _helpCmd .. query
@@ -437,7 +437,8 @@ end
 -- Just Julia for now
 local function parseVariableIterable(line)
     for _, pVar in ipairs({"%w+", "%b()"}) do
-        for _, pIter in ipairs({"%w+", "%b()", "%b[]"}) do
+        -- order matters, e.g. `x in func(arg1, arg2)` would also be matched by "%w+"
+        for _, pIter in ipairs({"%w+%b()", "%w+", "%b()", "%b[]"}) do
             local variable, iterable = line:match("(" .. pVar .. ") in (" .. pIter .. ")")
             if variable ~= nil then
                 return variable, iterable
