@@ -443,6 +443,10 @@ local function parseVariableIterable(line)
             if variable ~= nil then
                 return variable, iterable
             end
+            variable, iterable = line:match("(" .. pVar .. ") = (" .. pIter .. ")")
+            if variable ~= nil then
+                return variable, iterable
+            end
         end
     end
 end
