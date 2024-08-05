@@ -127,7 +127,7 @@ local function get_focused_tab()
                 end
             end
         end
-    end   
+    end
 end
 
 local function get_repl_win()
@@ -141,7 +141,7 @@ local function get_repl_win()
                 end
             end
         end
-    end   
+    end
 end
 
 -- Get window id of the ith window visible on the current tab.
@@ -436,9 +436,9 @@ end
 
 -- Just Julia for now
 local function parseVariableIterable(line)
-    for _, pVar in ipairs({"%w+", "%b()"}) do
+    for _, pVar in ipairs({"[%w_]+", "%b()"}) do
         -- order matters, e.g. `x in func(arg1, arg2)` would also be matched by "%w+"
-        for _, pIter in ipairs({"%w+%b()", "%w+", "%b()", "%b[]"}) do
+        for _, pIter in ipairs({"[%w_]+%b()", "[%w_]+", "%b()", "%b[]"}) do
             local variable, iterable
             variable, iterable = line:match("(" .. pVar .. ") in (" .. pIter .. ")")
             if variable ~= nil then
@@ -611,7 +611,7 @@ function setup(userconfig)
     end
 
     local c = config
-    
+
     -- match against start of line, get the location of the end
     for k, v in pairs(c.match.prompt) do
         c.match.prompt[k][1] = "^" .. v[1] .. "()"
