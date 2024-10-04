@@ -57,6 +57,10 @@ local config = {
         r="radian --r-binary /Library/Frameworks/R.framework/Resources/R",
         lua="lua",
     },
+    -- Additional to command, when given a vim.v.count
+    command_count = {
+        julia=" -t ",
+    },
     -- language specific matching
     match = {
         -- kitty @ ls foreground_processes cmdline value to recognize.
@@ -458,10 +462,17 @@ end
 
 -- Top level keybound commands.
 
---- Launch a new REPL window
+--- Launch a new REPL window.
+--- vim.v.count used as well, e.g. to use multiple threads.
 function ReplNew()
     -- default to zsh
     local ftcommand = config.command[vim.bo.filetype] or ""
+    if vim.v.count > 0 then
+        local ftcommand_count = config.command_count[vim.bo.filetype]
+        if ftcommand_count ~= nil then
+            ftcommand = ftcommand .. ftcommand_count .. vim.v.count
+        end
+    end
     local fh = io.popen('kitty @ launch --cwd=current --keep-focus ' .. ftcommand)
     local window_id = fh:read("*n") -- *n means read number, which means we also strip newline
     fh:close()
