@@ -42,7 +42,7 @@ local config = {
     -- stock python repl is particularly bad. It doesn't support bracketed, it 
     -- can't handle empty line within indentation, it doesn't understand the 
     -- SOH code.
-    bracketed = { ipython=true, python=false, radian=true, r=false, julia=true, pymol=false, },
+    bracketed = { ipython=true, python=false, radian=true, r=false, julia=true, pymol=false, pml=false, },
     -- Stock python REPL writes "..." too slow when running multiple lines.
     -- This "linewise" config enables splitting multiline messages by newlines 
     -- and sends them one at a time. Still skipping empty newlines or adding 
