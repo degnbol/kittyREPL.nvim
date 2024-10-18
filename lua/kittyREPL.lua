@@ -42,7 +42,7 @@ local config = {
     -- stock python repl is particularly bad. It doesn't support bracketed, it 
     -- can't handle empty line within indentation, it doesn't understand the 
     -- SOH code.
-    bracketed = { ipython=true, python=false, radian=true, r=false, julia=true },
+    bracketed = { ipython=true, python=false, radian=true, r=false, julia=true, pymol=false, },
     -- Stock python REPL writes "..." too slow when running multiple lines.
     -- This "linewise" config enables splitting multiline messages by newlines 
     -- and sends them one at a time. Still skipping empty newlines or adding 
@@ -56,6 +56,11 @@ local config = {
         -- kitty command doesn't know where R is since it doesn't have all the env copied.
         r="radian --r-binary /Library/Frameworks/R.framework/Resources/R",
         lua="lua",
+        -- TODO: use pymol/pml
+        -- interactive REPL for pymol that understands multiline python input but not pml
+        pymol="pymol -xpqd python",
+        -- pymol language. pymol cmds. Understands single line python.
+        pml="pymol -pqd",
     },
     -- Additional to command, when given a vim.v.count
     command_count = {
@@ -71,6 +76,7 @@ local config = {
             IPython="python",
             R="r",
             radian="r",
+            pymol="pymol",
         },
         -- patterns to match for prompt start and continuation for each supported REPL program
         prompt = {
@@ -86,6 +92,7 @@ local config = {
             sh = {"❯ ", "%a*> "},
             bash = {"[%w.-]*$ ", "> "},
             lua = {"> ", ">> "},
+            pymol = {"", ""},
         },
         -- Help command by REPL command and context, often a "?" prefix.
         -- For each REPL command provide either a help command prefix string, a two element array with prefix and suffix, 
@@ -288,6 +295,7 @@ function kittySend(text, post, raw)
             -- It would also work to add any amount of whitespace on the empty lines.
             -- We use the linewise send above instead.
             -- kittySendRaw(text:gsub('\n+', '\n') .. post)
+            -- kittySendRaw(text .. post)
             kittySendRaw(text .. post)
         end
     end
