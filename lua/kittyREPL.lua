@@ -147,7 +147,7 @@ local config = {
             -- wrap multiline in python .. python end
             -- https://pymolwiki.org/index.php/PythonTerminal
             if text:match('\n') then
-                kittySendRaw("python\n" .. text .. "python end" .. post)
+                kittySendRaw("python\n" .. text:gsub("\n*$", "") .. "\npython end" .. post)
             else
                 kittySendRaw(text .. post)
             end
