@@ -1,10 +1,15 @@
 #!/usr/bin/env lua
-local g = vim.g
 local b = vim.b
 local cmd = vim.cmd
 local fn = vim.fn
 
-
+---Count number of occurences of pattern in text.
+---@param text string
+---@param pattern string
+---@return integer
+local function strcount(text, pattern)
+    return select(2, string.gsub(text, pattern, ""))
+end
 
 -- LATER: use function rather than string after pull request is merged:
 -- https://github.com/neovim/neovim/pull/20187
@@ -15,8 +20,16 @@ local function operator(funcname)
     end
 end
 
-local function kitty_ls()
-    local fh = io.popen('kitty @ ls 2> /dev/null')
+---Parse kitty @ ls output into table.
+---@param match string? optionally filter with --match argument
+---@return table
+local function kitty_ls(match)
+    if match == nil then
+        match = ""
+    else
+        match = " --match="..match
+    end
+    local fh = io.popen('kitty @ ls'..match..' 2> /dev/null')
     local json_string = fh:read("*a")
     fh:close()
     -- if we are not in fact in a kitty terminal then the command will fail
@@ -151,6 +164,10 @@ local config = {
             else
                 kittySendRaw(text .. post)
             end
+        end,
+        lua = function (text, post)
+            -- top level locals are ignored in REPL so we strip that.
+            kittySendRaw(text:gsub("^local ", ""):gsub("\nlocal ", "\n") .. post)
         end
     },
     -- command to execute in new kitty window.
@@ -238,18 +255,30 @@ local config = {
     },
 }
 
----Detect REPL window relevant for the current filetype by scanning through 
----windows and matching on cmdline and title.
+---Detect REPL window relevant for the current filetype and detect which cmd is 
+---being run in the repl by scanning through windows and matching on cmdline 
+---and title.
 ---@param wins? table list of window ids to search. Default=all in the focused tab.
 ---@return integer?
 local function detect_REPL(wins)
+    local detect = config.match.detect[vim.bo.filetype]
     if wins == nil then
+        if detect == nil then
+            print("No detect config for " .. vim.bo.filetype .. ". Can't detect window and assumes REPL command is \"" .. vim.bo.filetype .. "\".")
+            b.repl_cmd = vim.bo.filetype
+            return
+        end
         local focused_tab = get_focused_tab()
         if focused_tab == nil then return end
         wins = focused_tab.windows
     end
     for _, win in ipairs(wins) do
-        if detect_REPL(win) then return end
+        if type(win) == "number" then
+            -- with the --match=id:win filter we still get the same hierarchy, 
+            -- but "tabs" and "windows" only have 1 entry each due to the 
+            -- filter.
+            win = kitty_ls("id:"..win)[1].tabs[1].windows[1]
+        end
         -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`, 
         -- then PlotlyJS will open other processes that are listed earlier in the list. 
         -- If there are any problems then just loop and look in all foreground processes.
@@ -257,7 +286,13 @@ local function detect_REPL(wins)
         local cmdline = procs[#procs].cmdline
         -- we would never send to the editor.
         if not win.is_self and cmdline[1] ~= "nvim" then
-            local repl_cmd = config.match.detect[vim.bo.filetype](cmdline, win.title)
+            -- no detection config, but we are specifying exactly which window the REPL is in
+            if detect == nil and #wins == 1 then
+                b.repl_cmd = table.concat(cmdline, " ")
+                print("No detect config for " .. vim.bo.filetype .. ". Assumes REPL command is \"" .. b.repl_cmd .. "\".")
+                return win.id
+            end
+            local repl_cmd = detect(cmdline, win.title)
             if repl_cmd then
                 b.repl_cmd = repl_cmd
                 b.repl_win = win.id
@@ -285,22 +320,22 @@ local function kittySend(text, post, raw)
     if raw then
         kittySendRaw(text .. post)
     else
-        if config.bracketed[vim.b.repl_cmd] then
-            print("brack")
-            kittySendBracketed(text, post)
+        if config.custom[vim.b.repl_cmd] then
+            config.custom[vim.b.repl_cmd](text, post)
+        elseif config.bracketed[vim.b.repl_cmd] then
+            if strcount(text, "\n") > 0 then
+                kittySendBracketed(text, post)
+            else
+                kittySendRaw(text .. post)
+            end
         elseif config.linewise[vim.b.repl_cmd] then
-            print("linew")
-            for i, line in ipairs(vim.split(text, '\n')) do
+            for _, line in ipairs(vim.split(text, '\n')) do
                 if line ~= "" then
                     kittySendRaw(line .. '\n')
                 end
             end
             kittySendRaw(post)
-        elseif config.custom[vim.b.repl_cmd] then
-            print("custom")
-            config.custom[vim.b.repl_cmd](text, post)
         else
-            print("else")
             -- mostly for python's sake, we could remove empty lines.
             -- It would also work to add any amount of whitespace on the empty lines.
             -- We use the linewise send above instead.
@@ -362,14 +397,14 @@ local function parseScrollback()
 end
 
 ---Scroll through REPL commands, while parsing scrollback when necessary.
----@param delta integer. 1 or -1
+---@param delta integer 1 or -1
 ---@return table of strings
 local function scroll(delta)
     if vim.v.count ~= 0 then
         delta = delta * vim.v.count
     end
     if delta > 0 then
-        for i = 1, delta do
+        for _ = 1, delta do
             if iScrollback == #tScrollback then
                 -- skip empty prompts
                 local rcmd = {""}
@@ -521,7 +556,7 @@ end
 local function ReplRunLine()
     local count = vim.v.count > 0 and vim.v.count or 1
     for _ = 1, count do
-        kittyRun(vim.api.nvim_get_current_line(), true)
+        kittyRun(vim.api.nvim_get_current_line(), false)
         if config.progress then
             cmd 'silent normal! j'
         end
@@ -530,7 +565,7 @@ end
 local function ReplPasteLine()
     local count = vim.v.count > 0 and vim.v.count or 1
     for _ = 1, count do
-        kittyPaste(vim.api.nvim_get_current_line(), true)
+        kittyPaste(vim.api.nvim_get_current_line(), false)
         if config.progress then
             cmd 'silent normal! j'
         end
