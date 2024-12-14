@@ -197,6 +197,9 @@ local config = {
                 end
             end,
             python = function (cmdline, title)
+                if title:match("^IPython:") then
+                    return "ipython"
+                end
                 -- ["/opt/homebrew/Caskroom/miniforge/base/envs/pymol/bin/python", "/opt/homebrew/Caskroom/miniforge/base/envs/pymol/lib/python3.12/site-packages/pymol/__init__.py"] -> pymol
                 if cmdline[2]:match("/pymol/__init__.py$") then
                     return "pymol"
@@ -207,9 +210,6 @@ local config = {
                     return "ipython"
                 elseif firstword:match("python3?") then
                     return "python"
-                end
-                if title:match("^IPython:") then
-                    return "ipython"
                 end
             end,
             r = function (cmdline, title)
