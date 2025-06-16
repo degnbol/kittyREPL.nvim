@@ -14,7 +14,7 @@ end
 -- LATER: use function rather than string after pull request is merged:
 -- https://github.com/neovim/neovim/pull/20187
 local function operator(funcname)
-    return function ()
+    return function()
         vim.opt.operatorfunc = "v:lua." .. funcname
         return "g@"
     end
@@ -27,9 +27,9 @@ local function kitty_ls(match)
     if match == nil then
         match = ""
     else
-        match = " --match="..match
+        match = " --match=" .. match
     end
-    local fh = io.popen('kitty @ ls'..match..' 2> /dev/null')
+    local fh = io.popen('kitty @ ls' .. match .. ' 2> /dev/null')
     local json_string = fh:read("*a")
     fh:close()
     -- if we are not in fact in a kitty terminal then the command will fail
@@ -70,7 +70,6 @@ function get_winid(i)
     return get_focused_tab().windows[i].id
 end
 
-
 function kittyExists(window_id)
     -- see if kitty window exists by getting text from it and checking if the operation fails (nonzero exit code).
     return os.execute('kitty @ get-text --match id:' .. window_id .. ' > /dev/null 2> /dev/null') == 0
@@ -88,8 +87,8 @@ local function kittySendRaw(text)
 end
 
 --- Fixes indentation by prepending Start Of Header signal.
---- This can be a fallback method if a REPL doesn't support bracketed paste, 
---- however each line will then be sent and called separately, which may be a 
+--- This can be a fallback method if a REPL doesn't support bracketed paste,
+--- however each line will then be sent and called separately, which may be a
 --- problem if there are empty lines within the sent block.
 local function SOH(text)
     return text:gsub('\n', '\n\x01')
@@ -97,7 +96,7 @@ end
 
 --- Get repo root.
 local function ROOT()
-    -- get diretory of current script 
+    -- get diretory of current script
     -- https://stackoverflow.com/questions/6380820/get-containing-path-of-lua-file
     return debug.getinfo(1).source:match("@?(.*/)") .. '/..'
 end
@@ -105,7 +104,7 @@ end
 function kittySendBracketed(text, post)
     -- bracketedPaste.sh uses zsh to do bracketed paste cat from stdin to stdout.
     -- easiest to use stdin rather than putting the text as an arg due to worrying about escaping characters
-    local fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. b.repl_win .. ' "' .. post ..'"', 'w')
+    local fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. b.repl_win .. ' "' .. post .. '"', 'w')
     fh:write(text)
     fh:close()
 end
@@ -113,50 +112,51 @@ end
 local config = {
     -- Set keymaps in setup call or map something to these <plug> maps.
     keymap = {
-        new           = "<plug>kittyReplNew",
-        focus         = "<plug>kittyReplFocus",
-        set           = "<plug>kittyReplSet",
-        setlast       = "<plug>kittyReplSetLast",
-        run           = "<plug>kittyReplRun",
-        paste         = "<plug>kittyReplPaste",
-        help          = "<plug>kittyReplHelp",
-        runLine       = "<plug>kittyReplRunLine",
-        runLineFor    = "<plug>kittyReplRunLineFor",
-        pasteLine     = "<plug>kittyReplPasteLine",
-        runVisual     = "<plug>kittyReplRunVisual",
-        pasteVisual   = "<plug>kittyReplPasteVisual",
-        q             = "<plug>kittyReplQ",
-        cr            = "<plug>kittyReplCR",
-        ctrld         = "<plug>kittyReplCtrld",
-        ctrlc         = "<plug>kittyReplCtrlc",
-        interrupt     = "<plug>kittyReplInterrupt",
-        scrollStart   = "<plug>kittyReplScrollStart",
-        scrollUp      = "<plug>kittyReplScrollUp",
-        scrollDown    = "<plug>kittyReplScrollDown",
-        progress      = "<plug>kittyReplToggleProgress",
-        editPaste     = "<plug>kittyReplToggleEditPaste",
+        new         = "<plug>kittyReplNew",
+        focus       = "<plug>kittyReplFocus",
+        set         = "<plug>kittyReplSet",
+        setlast     = "<plug>kittyReplSetLast",
+        run         = "<plug>kittyReplRun",
+        paste       = "<plug>kittyReplPaste",
+        help        = "<plug>kittyReplHelp",
+        runLine     = "<plug>kittyReplRunLine",
+        runLineFor  = "<plug>kittyReplRunLineFor",
+        runLineForI = "<plug>kittyReplRunLineForI",
+        pasteLine   = "<plug>kittyReplPasteLine",
+        runVisual   = "<plug>kittyReplRunVisual",
+        pasteVisual = "<plug>kittyReplPasteVisual",
+        q           = "<plug>kittyReplQ",
+        cr          = "<plug>kittyReplCR",
+        ctrld       = "<plug>kittyReplCtrld",
+        ctrlc       = "<plug>kittyReplCtrlc",
+        interrupt   = "<plug>kittyReplInterrupt",
+        scrollStart = "<plug>kittyReplScrollStart",
+        scrollUp    = "<plug>kittyReplScrollUp",
+        scrollDown  = "<plug>kittyReplScrollDown",
+        progress    = "<plug>kittyReplToggleProgress",
+        editPaste   = "<plug>kittyReplToggleEditPaste",
     },
     -- Disable plugin for these filetypes:
     exclude = {
-        TelescopePrompt=true, -- redundant since buftype is prompt.
-        oil=true,
+        TelescopePrompt = true, -- redundant since buftype is prompt.
+        oil = true,
     },
-    progress = true, -- should the cursor progress after a command is run?
-    editpaste = false, -- should we immidiately go to REPL when pasting?
+    progress = true,    -- should the cursor progress after a command is run?
+    editpaste = false,  -- should we immidiately go to REPL when pasting?
     closepager = false, -- autoclose pager if open when running/pasting
     -- not all REPLs support bracketed paste.
-    -- stock python repl is particularly bad. It doesn't support bracketed, it 
-    -- can't handle empty line within indentation, it doesn't understand the 
+    -- stock python repl is particularly bad. It doesn't support bracketed, it
+    -- can't handle empty line within indentation, it doesn't understand the
     -- SOH code.
-    bracketed = { ipython=true, python=false, radian=true, r=false, julia=true, pymol=false, pml=false, },
+    bracketed = { ipython = true, python = false, radian = true, r = false, julia = true, pymol = false, pml = false, },
     -- Stock python REPL writes "..." too slow when running multiple lines.
-    -- This "linewise" config enables splitting multiline messages by newlines 
-    -- and sends them one at a time. Still skipping empty newlines or adding 
+    -- This "linewise" config enables splitting multiline messages by newlines
+    -- and sends them one at a time. Still skipping empty newlines or adding
     -- whitespace to them.
-    linewise = { python=true, },
+    linewise = { python = true, },
     -- custom functions for how to send code to the REPL. Args: text, post. post is either '' or '\n'.
     custom = {
-        pymol = function (text, post)
+        pymol = function(text, post)
             -- wrap multiline in python .. python end
             -- https://pymolwiki.org/index.php/PythonTerminal
             if text:match('\n') then
@@ -165,24 +165,30 @@ local config = {
                 kittySendRaw(text .. post)
             end
         end,
-        lua = function (text, post)
+        lua = function(text, post)
             -- top level locals are ignored in REPL so we strip that.
             kittySendRaw(text:gsub("^local ", ""):gsub("\nlocal ", "\n") .. post)
-        end
+        end,
+        -- Fixed a huge problem, super weird, julia was insanely slow typing one char at a time.
+        -- I realised it was because even though we set it to use bracketed it only sends it bracketed with multiline.
+        -- Solution here: always send bracketed.
+        julia = function(text, post)
+            kittySendBracketed(text, post)
+        end,
     },
     -- command to execute in new kitty window.
     -- TODO: add fallback and don't assume MacOS.
     command = {
-        python="ipython",
-        julia="julia",
+        python = "ipython",
+        julia = "julia",
         -- kitty command doesn't know where R is since it doesn't have all the env copied.
-        r="radian --r-binary /Library/Frameworks/R.framework/Resources/R",
-        lua="lua",
-        pymol="pymol -xpq",
+        r = "radian --r-binary /Library/Frameworks/R.framework/Resources/R",
+        lua = "lua",
+        pymol = "pymol -xpq",
     },
     -- Additional to command, when given a vim.v.count
     command_count = {
-        julia=" -t ",
+        julia = " -t ",
     },
     -- language specific matching
     match = {
@@ -190,13 +196,13 @@ local config = {
         -- over SSH the foreground_processes.cmdline will simply be ["ssh", ...] so we also detect using title
         -- filetype -> function(cmdline, title) -> nil or REPL name
         detect = {
-            julia = function (cmdline, title)
+            julia = function(cmdline, title)
                 -- ["/usr/local/bin/julia", "-t", "4"] -> julia
                 if cmdline[1]:match("[%w.]+$") == "julia" then
                     return "julia"
                 end
             end,
-            python = function (cmdline, title)
+            python = function(cmdline, title)
                 if title:match("^IPython:") then
                     return "ipython"
                 end
@@ -212,9 +218,9 @@ local config = {
                     return "python"
                 end
             end,
-            r = function (cmdline, title)
+            r = function(cmdline, title)
                 -- [".../R"] -> r
-                if  cmdline[1]:match("[%w.]+$") == "R" or
+                if cmdline[1]:match("[%w.]+$") == "R" or
                     -- ["../Python", ".../radian"] -> r
                     cmdline[2]:match("[%w.]+$") == "radian" then
                     return "r"
@@ -228,35 +234,37 @@ local config = {
         -- patterns to match for prompt start and continuation for each supported REPL program
         prompt = {
             -- this will not understand pkg prompts on the form (ENV) pkg>
-            -- This should be fine for grabbing cmd inputs but not for grabbing 
+            -- This should be fine for grabbing cmd inputs but not for grabbing
             -- outputs, if we were to want that. A solution would be a table of patterns, with a second pkg pattern.
-            julia = {"%a*%??> ", "  "},
-            radian = {"> ", "  "},
-            r = {"> ", "+ "},
-            python = {">>> ", "... "},
-            ipython = {"In %[%d+%]: ", " +...: "},
-            zsh = {"❯ ", "%a*> "}, -- e.g. for>
-            sh = {"❯ ", "%a*> "},
-            bash = {"[%w.-]*$ ", "> "},
-            lua = {"> ", ">> "},
-            pymol = {"", ""},
+            julia = { "%a*%??> ", "  " },
+            radian = { "> ", "  " },
+            r = { "> ", "+ " },
+            python = { ">>> ", "... " },
+            ipython = { "In %[%d+%]: ", " +...: " },
+            zsh = { "❯ ", "%a*> " }, -- e.g. for>
+            sh = { "❯ ", "%a*> " },
+            bash = { "[%w.-]*$ ", "> " },
+            lua = { "> ", ">> " },
+            pymol = { "", "" },
         },
         -- Help command by REPL command and context, often a "?" prefix.
-        -- For each REPL command provide either a help command prefix string, a two element array with prefix and suffix, 
+        -- For each REPL command provide either a help command prefix string, a two element array with prefix and suffix,
         -- or a key-value table where each key will be matched against the last prompt (from first to last key).
         -- E.g. julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
         help = {
             -- TODO: this shouldn't be default as it assumes TerminalPager is installed.
-            julia={["pager??>"]="", ["pager>"]="?", ["help??>"]="", [">"]="@help "},
-            radian="?", r="?",
-            ipython="?", python={"help(", ")"},
-            lua="", -- no help available
+            julia = { ["pager??>"] = "", ["pager>"] = "?", ["help??>"] = "", [">"] = "@help " },
+            radian = "?",
+            r = "?",
+            ipython = "?",
+            python = { "help(", ")" },
+            lua = "", -- no help available
         },
     },
 }
 
----Detect REPL window relevant for the current filetype and detect which cmd is 
----being run in the repl by scanning through windows and matching on cmdline 
+---Detect REPL window relevant for the current filetype and detect which cmd is
+---being run in the repl by scanning through windows and matching on cmdline
 ---and title.
 ---@param wins? table list of window ids to search. Default=all in the focused tab.
 ---@return integer?
@@ -264,7 +272,8 @@ local function detect_REPL(wins)
     local detect = config.match.detect[vim.bo.filetype]
     if wins == nil then
         if detect == nil then
-            print("No detect config for " .. vim.bo.filetype .. ". Can't detect window and assumes REPL command is \"" .. vim.bo.filetype .. "\".")
+            print("No detect config for " ..
+                vim.bo.filetype .. ". Can't detect window and assumes REPL command is \"" .. vim.bo.filetype .. "\".")
             b.repl_cmd = vim.bo.filetype
             return
         end
@@ -274,13 +283,13 @@ local function detect_REPL(wins)
     end
     for _, win in ipairs(wins) do
         if type(win) == "number" then
-            -- with the --match=id:win filter we still get the same hierarchy, 
-            -- but "tabs" and "windows" only have 1 entry each due to the 
+            -- with the --match=id:win filter we still get the same hierarchy,
+            -- but "tabs" and "windows" only have 1 entry each due to the
             -- filter.
-            win = kitty_ls("id:"..win)[1].tabs[1].windows[1]
+            win = kitty_ls("id:" .. win)[1].tabs[1].windows[1]
         end
-        -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`, 
-        -- then PlotlyJS will open other processes that are listed earlier in the list. 
+        -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`,
+        -- then PlotlyJS will open other processes that are listed earlier in the list.
         -- If there are any problems then just loop and look in all foreground processes.
         local procs = win.foreground_processes
         local cmdline = procs[#procs].cmdline
@@ -304,7 +313,7 @@ end
 
 -- Run function f with args... if REPL is valid.
 local function replCheck(f)
-    return function (...)
+    return function(...)
         if b.repl_win ~= nil and kittyExists(b.repl_win) or detect_REPL() ~= nil then
             return f(...)
         else
@@ -380,7 +389,7 @@ local function parseScrollback()
         scrollback = scrollback:sub(1, #scrollback - #lastline - 1)
         local mPrompt = lastline:match(pat)
         if mPrompt ~= nil then
-            local rcmd = {lastline:sub(mPrompt)}
+            local rcmd = { lastline:sub(mPrompt) }
             for i, line in ipairs(lines) do
                 local mPromptCont = line:match(patCont)
                 if mPromptCont ~= nil then
@@ -407,7 +416,7 @@ local function scroll(delta)
         for _ = 1, delta do
             if iScrollback == #tScrollback then
                 -- skip empty prompts
-                local rcmd = {""}
+                local rcmd = { "" }
                 while table.concat(rcmd) == "" do
                     rcmd = parseScrollback()
                     if rcmd == nil then
@@ -447,7 +456,8 @@ function replDetectPager()
     -- n is an integer indicating cursor row and m indicates cursor column. Both 1-indexed.
     -- ^[[?25h means "show the cursor". I don't know what ^[[?12h does.
     -- https://en.wikipedia.org/wiki/ANSI_escape_code
-    local helplines, lastline, blanklines, r, c = scrollback:match("(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
+    local helplines, lastline, blanklines, r, c = scrollback:match(
+        "(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
     -- if we aren't scrolled to the bottom lastline will be nil.
     if lastline == nil then return false end
     local pagerMatch = lastline:match("^(:)")
@@ -457,7 +467,7 @@ function replDetectPager()
     local _, nlines = helplines:gsub('\n', '')
     -- +2 since "lines" doesn't contain "lastline" and the newline right before it.
     -- NOTE: The pattern doesn't work if that newline gets included.
-    return tonumber(r) == nlines+2 and tonumber(c) == #pagerMatch + 1
+    return tonumber(r) == nlines + 2 and tonumber(c) == #pagerMatch + 1
 end
 
 ---Get the help command needed to prefix a help search term for the current language.
@@ -465,8 +475,8 @@ end
 ---@return string: string cmd to run in REPL to get help for a given query.
 function replHelpCmd(query)
     local helpCmd = config.match.help[vim.bo.filetype] or "?"
-    -- if the config.match.help entry for a language is a table, then it means 
-    -- we need to look for the current REPL prompt context to understand which 
+    -- if the config.match.help entry for a language is a table, then it means
+    -- we need to look for the current REPL prompt context to understand which
     -- prefix is appropriate.
     if type(helpCmd) ~= "table" then return helpCmd .. query end
     if vim.tbl_islist(helpCmd) and #helpCmd == 2 then
@@ -493,9 +503,9 @@ end
 
 -- Just Julia for now
 local function parseVariableIterable(line)
-    for _, pVar in ipairs({"[%w_]+", "%b()"}) do
+    for _, pVar in ipairs({ "[%w_]+", "%b()" }) do
         -- order matters, e.g. `x in func(arg1, arg2)` would also be matched by "%w+"
-        for _, pIter in ipairs({"[%w_]+%b()", "[%w_]+", "%b()", "%b[]"}) do
+        for _, pIter in ipairs({ "[%w_.]+%b()", "[%w_.]+", "%b()", "%b[]" }) do
             local variable, iterable
             variable, iterable = line:match("(" .. pVar .. ") in (" .. pIter .. ")")
             if variable ~= nil then
@@ -529,18 +539,20 @@ function ReplNew()
     local fh = io.popen('kitty @ launch --cwd=current --keep-focus ' .. ftcommand)
     local win = fh:read("*n") -- *n means read number, which means we also strip newline
     fh:close()
-    -- show id in the title so we can easily set is as target, but also start 
+    -- show id in the title so we can easily set is as target, but also start
     -- with the cmd like it would have been named by if opened in a regular way.
     local title = ftcommand:match("[^ ]+") .. " id=" .. win
     os.execute("kitty @ set-window-title --match id:" .. win .. " " .. title)
     b.repl_win = win
     b.repl_cmd = ftcommand:match("[^ ]+"):lower()
 end
+
 -- manually set repl as ith visible window from a prompt.
 -- Useful to have keybinding to this function.
 function ReplSetI()
     b.repl_win = get_winid(tonumber(fn.input("Window i: ")))
 end
+
 local function ReplSet()
     b.repl_win = tonumber(fn.input("Window id: "))
 end
@@ -548,7 +560,7 @@ end
 local function ReplSetLast()
     local history = get_focused_tab().active_window_history
     b.repl_win = history[#history]
-    if not detect_REPL{b.repl_win} then
+    if not detect_REPL { b.repl_win } then
         -- fallback
         b.repl_cmd = vim.bo.filetype
     end
@@ -571,12 +583,25 @@ local function ReplPasteLine()
         end
     end
 end
+local ft_iterate = { julia = "first", python = "next" }
 local function ReplRunLineFor()
     local count = vim.v.count > 0 and vim.v.count or 1
-    -- TODO: language specific, right now test julia
     local variable, iterable = parseVariableIterable(vim.api.nvim_get_current_line())
     -- TODO: count used for not running first but later entry of iterable.
-    local torun = variable .. " = first(" .. iterable .. ")"
+    local torun = variable .. " = " .. ft_iterate[vim.bo.filetype] .. "(" .. iterable .. ")"
+    kittyRun(torun, true)
+    if config.progress then
+        cmd 'silent normal! j'
+    end
+end
+local ft_indexing = { julia = 1, python = 0, r = 1 }
+---Same as ReplRunLineFor but instead of using next etc. assuming iterator we use indexing.
+---Count is used for the index. If not given explicitly it will default to 1 or
+---0 depending on if the language is 1 or 0-indexed.
+local function ReplRunLineForI()
+    local count = vim.v.count > 0 and vim.v.count or ft_indexing[vim.bo.filetype]
+    local variable, iterable = parseVariableIterable(vim.api.nvim_get_current_line())
+    local torun = variable .. " = " .. iterable .. "[" .. count .. "]"
     kittyRun(torun, true)
     if config.progress then
         cmd 'silent normal! j'
@@ -613,6 +638,7 @@ function ReplRunOperator(type, ...)
         cmd 'silent normal! `]w'
     end
 end
+
 function ReplPasteOperator(type, ...)
     if type == "char" then
         cmd 'silent normal! `[v`]"ky'
@@ -624,6 +650,7 @@ function ReplPasteOperator(type, ...)
         cmd 'silent normal! `]w'
     end
 end
+
 local function ReplHelp()
     kittyRun(replHelpCmd(fn.expand("<cword>")), true)
 end
@@ -636,8 +663,9 @@ local function ReplHelpVisual()
 end
 --- Make a function to send given text when called.
 function kittySendCustom(text)
-    return function () kittySendRaw(text) end
+    return function() kittySendRaw(text) end
 end
+
 --- Send a SIGINT to the REPL.
 local function kittyInterrupt()
     return os.execute('kitty @ signal-child --match id:' .. b.repl_win)
@@ -645,12 +673,12 @@ end
 local function startScroll()
     readScrollback()
     local rcmd = scroll(1)
-    if rcmd == nil then return end -- in case no commands can be detected
+    if rcmd == nil then return end           -- in case no commands can be detected
     vim.api.nvim_put(rcmd, "c", true, false) -- "follow=true" only moves the cursor 1 char.
     vim.cmd.normal("v`[o")
 end
 local function replaceScroll(delta)
-    return function ()
+    return function()
         -- edge case where replaceScroll is called before startScroll
         if iScrollback == 0 then readScrollback() end
         local rcmd = scroll(delta)
@@ -662,6 +690,7 @@ function ReplToggleProgress()
     config.progress = not config.progress
     print("REPL progress =", config.progress)
 end
+
 function ReplToggleEditPaste()
     config.editpaste = not config.editpaste
     print("REPL edit paste =", config.editpaste)
@@ -683,42 +712,45 @@ function setup(userconfig)
     end
 
 
-    local group = vim.api.nvim_create_augroup("kittyRepl", {clear=true})
+    local group = vim.api.nvim_create_augroup("kittyRepl", { clear = true })
     -- BufEnter is too early for e.g. cmdline window to assign buftype
     vim.api.nvim_create_autocmd("Filetype", {
         group = group,
-        callback = function ()
-            if vim.bo.buftype ~= "" then return end 
+        callback = function()
+            if vim.bo.buftype ~= "" then return end
             if c.exclude[vim.bo.filetype] then return end
 
             function opts(desc)
-                return {buffer=true, silent=true, desc=desc}
+                return { buffer = true, silent = true, desc = desc }
             end
 
             local map = vim.keymap.set
-            map('n', c.keymap.new,         ReplNew,                                  opts("REPL new"))
-            map('n', c.keymap.focus,       replCheck(ReplFocus),                     opts("REPL focus"))
-            map('n', c.keymap.set,         ReplSet,                                  opts("REPL set"))
-            map('n', c.keymap.setlast,     ReplSetLast,                              opts("REPL set last"))
-            map('n', c.keymap.run,         replCheck(operator("ReplRunOperator")),   {buffer=true, silent=true, expr=true, desc="REPL run motion"})
-            map('n', c.keymap.paste,       replCheck(operator("ReplPasteOperator")), {buffer=true, silent=true, expr=true, desc="REPL paste motion"})
-            map('n', c.keymap.help,        replCheck(ReplHelp),                      opts("REPL help word under cursor"))
-            map('x', c.keymap.help,        replCheck(ReplHelpVisual),                opts("REPL help visual"))
-            map('n', c.keymap.runLine,     replCheck(ReplRunLine),                   opts("REPL run line"))
-            map('n', c.keymap.runLineFor,  replCheck(ReplRunLineFor),                opts("REPL run for loop iteration"))
-            map('n', c.keymap.pasteLine,   replCheck(ReplPasteLine),                 opts("REPL paste line"))
-            map('x', c.keymap.runVisual,   replCheck(ReplRunVisual),                 opts("REPL run visual"))
-            map('x', c.keymap.pasteVisual, replCheck(ReplPasteVisual),               opts("REPL paste visual"))
-            map('n', c.keymap.q,           replCheck(kittySendCustom("q")),          opts("REPL send q"))
-            map('n', c.keymap.cr,          replCheck(kittySendCustom("\x0d")),       opts("REPL send CR"))
-            map('n', c.keymap.ctrld,       replCheck(kittySendCustom("\x04")),       opts("REPL send Ctrl+d"))
-            map('n', c.keymap.ctrlc,       replCheck(kittySendCustom("\x03")),       opts("REPL send Ctrl+c"))
-            map('n', c.keymap.interrupt,   replCheck(kittyInterrupt),                opts("REPL interrupt"))
-            map('n', c.keymap.scrollStart, replCheck(startScroll),                   opts("REPL paste from scrollback"))
-            map('x', c.keymap.scrollUp,    replCheck(replaceScroll(1)),              opts("REPL paste older scrollback"))
-            map('x', c.keymap.scrollDown,  replCheck(replaceScroll(-1)),             opts("REPL paste newer scrollback"))
-            map('n', c.keymap.progress,    ReplToggleProgress,                       opts("REPL toggle progress"))
-            map('n', c.keymap.editPaste,   ReplToggleEditPaste,                      opts("REPL toggle edit paste"))
+            map('n', c.keymap.new, ReplNew, opts("REPL new"))
+            map('n', c.keymap.focus, replCheck(ReplFocus), opts("REPL focus"))
+            map('n', c.keymap.set, ReplSet, opts("REPL set"))
+            map('n', c.keymap.setlast, ReplSetLast, opts("REPL set last"))
+            map('n', c.keymap.run, replCheck(operator("ReplRunOperator")),
+                { buffer = true, silent = true, expr = true, desc = "REPL run motion" })
+            map('n', c.keymap.paste, replCheck(operator("ReplPasteOperator")),
+                { buffer = true, silent = true, expr = true, desc = "REPL paste motion" })
+            map('n', c.keymap.help, replCheck(ReplHelp), opts("REPL help word under cursor"))
+            map('x', c.keymap.help, replCheck(ReplHelpVisual), opts("REPL help visual"))
+            map('n', c.keymap.runLine, replCheck(ReplRunLine), opts("REPL run line"))
+            map('n', c.keymap.runLineFor, replCheck(ReplRunLineFor), opts("REPL iterate"))
+            map('n', c.keymap.runLineForI, replCheck(ReplRunLineForI), opts("REPL index"))
+            map('n', c.keymap.pasteLine, replCheck(ReplPasteLine), opts("REPL paste line"))
+            map('x', c.keymap.runVisual, replCheck(ReplRunVisual), opts("REPL run visual"))
+            map('x', c.keymap.pasteVisual, replCheck(ReplPasteVisual), opts("REPL paste visual"))
+            map('n', c.keymap.q, replCheck(kittySendCustom("q")), opts("REPL send q"))
+            map('n', c.keymap.cr, replCheck(kittySendCustom("\x0d")), opts("REPL send CR"))
+            map('n', c.keymap.ctrld, replCheck(kittySendCustom("\x04")), opts("REPL send Ctrl+d"))
+            map('n', c.keymap.ctrlc, replCheck(kittySendCustom("\x03")), opts("REPL send Ctrl+c"))
+            map('n', c.keymap.interrupt, replCheck(kittyInterrupt), opts("REPL interrupt"))
+            map('n', c.keymap.scrollStart, replCheck(startScroll), opts("REPL paste from scrollback"))
+            map('x', c.keymap.scrollUp, replCheck(replaceScroll(1)), opts("REPL paste older scrollback"))
+            map('x', c.keymap.scrollDown, replCheck(replaceScroll(-1)), opts("REPL paste newer scrollback"))
+            map('n', c.keymap.progress, ReplToggleProgress, opts("REPL toggle progress"))
+            map('n', c.keymap.editPaste, ReplToggleEditPaste, opts("REPL toggle edit paste"))
         end
     })
 end
