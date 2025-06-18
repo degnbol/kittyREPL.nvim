@@ -479,7 +479,7 @@ function replHelpCmd(query)
     -- we need to look for the current REPL prompt context to understand which
     -- prefix is appropriate.
     if type(helpCmd) ~= "table" then return helpCmd .. query end
-    if vim.tbl_islist(helpCmd) and #helpCmd == 2 then
+    if vim.islist(helpCmd) and #helpCmd == 2 then
         return helpCmd[1] .. query .. helpCmd[2]
     end
     -- otherwise key-value dict
