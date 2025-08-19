@@ -1,4 +1,3 @@
-#!/usr/bin/env lua
 local b = vim.b
 local cmd = vim.cmd
 local fn = vim.fn
@@ -140,6 +139,7 @@ local config = {
     exclude = {
         TelescopePrompt = true, -- redundant since buftype is prompt.
         oil = true,
+        qf = true,
     },
     progress = true,    -- should the cursor progress after a command is run?
     editpaste = false,  -- should we immidiately go to REPL when pasting?
@@ -207,7 +207,7 @@ local config = {
                     return "ipython"
                 end
                 -- ["/opt/homebrew/Caskroom/miniforge/base/envs/pymol/bin/python", "/opt/homebrew/Caskroom/miniforge/base/envs/pymol/lib/python3.12/site-packages/pymol/__init__.py"] -> pymol
-                if cmdline[2]:match("/pymol/__init__.py$") then
+                if cmdline ~= nil and cmdline[2]:match("/pymol/__init__.py$") then
                     return "pymol"
                 end
                 -- [".../python3"] -> python
@@ -566,8 +566,7 @@ local function ReplSetLast()
     end
 end
 local function ReplRunLine()
-    local count = vim.v.count > 0 and vim.v.count or 1
-    for _ = 1, count do
+    for _ = 1, vim.v.count1 do
         kittyRun(vim.api.nvim_get_current_line(), false)
         if config.progress then
             cmd 'silent normal! j'
@@ -575,8 +574,7 @@ local function ReplRunLine()
     end
 end
 local function ReplPasteLine()
-    local count = vim.v.count > 0 and vim.v.count or 1
-    for _ = 1, count do
+    for _ = 1, vim.v.count1 do
         kittyPaste(vim.api.nvim_get_current_line(), false)
         if config.progress then
             cmd 'silent normal! j'
@@ -585,9 +583,8 @@ local function ReplPasteLine()
 end
 local ft_iterate = { julia = "first", python = "next" }
 local function ReplRunLineFor()
-    local count = vim.v.count > 0 and vim.v.count or 1
     local variable, iterable = parseVariableIterable(vim.api.nvim_get_current_line())
-    -- TODO: count used for not running first but later entry of iterable.
+    -- TODO: vim.v.count1 used for not running first but later entry of iterable.
     local torun = variable .. " = " .. ft_iterate[vim.bo.filetype] .. "(" .. iterable .. ")"
     kittyRun(torun, true)
     if config.progress then
@@ -714,43 +711,50 @@ function setup(userconfig)
 
     local group = vim.api.nvim_create_augroup("kittyRepl", { clear = true })
     -- BufEnter is too early for e.g. cmdline window to assign buftype
-    vim.api.nvim_create_autocmd("Filetype", {
+    vim.api.nvim_create_autocmd("FileType", {
         group = group,
         callback = function()
             if vim.bo.buftype ~= "" then return end
             if c.exclude[vim.bo.filetype] then return end
 
-            function opts(desc)
-                return { buffer = true, silent = true, desc = desc }
+            local map = vim.keymap.set
+            local function nmap(lhs, rhs, desc, expr)
+                local opts = { buffer = true, silent = true }
+                opts["desc"] = desc
+                opts["expr"] = expr
+                map('n', lhs, rhs, opts)
+            end
+            local function xmap(lhs, rhs, desc, expr)
+                local opts = { buffer = true, silent = true }
+                opts["desc"] = desc
+                opts["expr"] = expr
+                map('x', lhs, rhs, opts)
             end
 
-            local map = vim.keymap.set
-            map('n', c.keymap.new, ReplNew, opts("REPL new"))
-            map('n', c.keymap.focus, replCheck(ReplFocus), opts("REPL focus"))
-            map('n', c.keymap.set, ReplSet, opts("REPL set"))
-            map('n', c.keymap.setlast, ReplSetLast, opts("REPL set last"))
-            map('n', c.keymap.run, replCheck(operator("ReplRunOperator")),
-                { buffer = true, silent = true, expr = true, desc = "REPL run motion" })
-            map('n', c.keymap.paste, replCheck(operator("ReplPasteOperator")),
-                { buffer = true, silent = true, expr = true, desc = "REPL paste motion" })
-            map('n', c.keymap.help, replCheck(ReplHelp), opts("REPL help word under cursor"))
-            map('x', c.keymap.help, replCheck(ReplHelpVisual), opts("REPL help visual"))
-            map('n', c.keymap.runLine, replCheck(ReplRunLine), opts("REPL run line"))
-            map('n', c.keymap.runLineFor, replCheck(ReplRunLineFor), opts("REPL iterate"))
-            map('n', c.keymap.runLineForI, replCheck(ReplRunLineForI), opts("REPL index"))
-            map('n', c.keymap.pasteLine, replCheck(ReplPasteLine), opts("REPL paste line"))
-            map('x', c.keymap.runVisual, replCheck(ReplRunVisual), opts("REPL run visual"))
-            map('x', c.keymap.pasteVisual, replCheck(ReplPasteVisual), opts("REPL paste visual"))
-            map('n', c.keymap.q, replCheck(kittySendCustom("q")), opts("REPL send q"))
-            map('n', c.keymap.cr, replCheck(kittySendCustom("\x0d")), opts("REPL send CR"))
-            map('n', c.keymap.ctrld, replCheck(kittySendCustom("\x04")), opts("REPL send Ctrl+d"))
-            map('n', c.keymap.ctrlc, replCheck(kittySendCustom("\x03")), opts("REPL send Ctrl+c"))
-            map('n', c.keymap.interrupt, replCheck(kittyInterrupt), opts("REPL interrupt"))
-            map('n', c.keymap.scrollStart, replCheck(startScroll), opts("REPL paste from scrollback"))
-            map('x', c.keymap.scrollUp, replCheck(replaceScroll(1)), opts("REPL paste older scrollback"))
-            map('x', c.keymap.scrollDown, replCheck(replaceScroll(-1)), opts("REPL paste newer scrollback"))
-            map('n', c.keymap.progress, ReplToggleProgress, opts("REPL toggle progress"))
-            map('n', c.keymap.editPaste, ReplToggleEditPaste, opts("REPL toggle edit paste"))
+            nmap(c.keymap.new, ReplNew, "REPL new")
+            nmap(c.keymap.focus, replCheck(ReplFocus), "REPL focus")
+            nmap(c.keymap.set, ReplSet, "REPL set")
+            nmap(c.keymap.setlast, ReplSetLast, "REPL set last")
+            nmap(c.keymap.run, replCheck(operator("ReplRunOperator")), "REPL run motion", true)
+            nmap(c.keymap.paste, replCheck(operator("ReplPasteOperator")), "REPL paste motion", true)
+            nmap(c.keymap.help, replCheck(ReplHelp), "REPL help word under cursor")
+            xmap(c.keymap.help, replCheck(ReplHelpVisual), "REPL help visual")
+            nmap(c.keymap.runLine, replCheck(ReplRunLine), "REPL run line")
+            nmap(c.keymap.runLineFor, replCheck(ReplRunLineFor), "REPL iterate")
+            nmap(c.keymap.runLineForI, replCheck(ReplRunLineForI), "REPL index")
+            nmap(c.keymap.pasteLine, replCheck(ReplPasteLine), "REPL paste line")
+            xmap(c.keymap.runVisual, replCheck(ReplRunVisual), "REPL run visual")
+            xmap(c.keymap.pasteVisual, replCheck(ReplPasteVisual), "REPL paste visual")
+            nmap(c.keymap.q, replCheck(kittySendCustom("q")), "REPL send q")
+            nmap(c.keymap.cr, replCheck(kittySendCustom("\x0d")), "REPL send CR")
+            nmap(c.keymap.ctrld, replCheck(kittySendCustom("\x04")), "REPL send Ctrl+d")
+            nmap(c.keymap.ctrlc, replCheck(kittySendCustom("\x03")), "REPL send Ctrl+c")
+            nmap(c.keymap.interrupt, replCheck(kittyInterrupt), "REPL interrupt")
+            nmap(c.keymap.scrollStart, replCheck(startScroll), "REPL paste from scrollback")
+            xmap(c.keymap.scrollUp, replCheck(replaceScroll(1)), "REPL paste older scrollback")
+            xmap(c.keymap.scrollDown, replCheck(replaceScroll(-1)), "REPL paste newer scrollback")
+            nmap(c.keymap.progress, ReplToggleProgress, "REPL toggle progress")
+            nmap(c.keymap.editPaste, ReplToggleEditPaste, "REPL toggle edit paste")
         end
     })
 end
