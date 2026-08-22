@@ -10,23 +10,24 @@ This is the invasive one. Let `commands.lua` stop moving before starting it.
 
 ## The problem
 
-`vim.b.repl_cmd` names the program in a kitty window but is written from five
-sites with four meanings:
+`vim.b.repl_cmd` names the program in a kitty window but is written from four
+sites with three meanings:
 
 | Site | Value it writes |
 |---|---|
-| `commands.lua:81` | launch command, lowercased |
-| `commands.lua:102` | filetype, `setLast` fallback |
-| `detect.lua:24` | filetype, no detect config |
-| `detect.lua:56` | whole joined cmdline |
+| `commands.lua:82` | launch command, lowercased |
+| `commands.lua:90` | nil, clearing the previous window's identity |
+| `detect.lua:55` | `cmdline[1]` basename, no detect config |
 | `detect.lua:62` | `match.detect` return |
 
-`commands.set` (`commands.lua:91`) and `setI` (`commands.lua:86`) write no
-identity at all — they assign only `repl_win`. Two of three attach paths therefore
-leave identity stale or nil.
-
-Identity is also stored on the wrong object: it describes a window but lives per
+Identity is stored on the wrong object: it describes a window but lives per
 buffer, so two buffers pointing at window 5 can disagree indefinitely.
+
+02 made the values agree across attach paths and routed `set`/`setI`/`setLast`
+through one local `attach` (`commands.lua:87`), which is the seam `repl.attach`
+replaces. What it could not fix is the split above: `commands.new` names the
+program from the command string, detection names it from the cmdline, and neither
+can see the other's answer.
 
 ## Do
 
@@ -44,22 +45,59 @@ Delete `vim.b.repl_cmd`. Nothing outside the plugin reads it: no statusline
 component, no `<plug>` map, nothing in `~/dotfiles/config/nvim`. Check personal
 snippets or ftplugin that a grep would not cover before removing.
 
-**Also fix `setLast` binding to your own nvim window.** `commands.lua:96-104`
+**Also fix `setLast` binding to your own nvim window.** `commands.lua:108-113`
 assigns `active_window_history[#history]` unconditionally. `detect_REPL` guards
-`win.is_self` and `cmdline[1] ~= "nvim"` (`detect.lua:53`), but on failure
-`setLast` keeps the bad `repl_win` and falls back to the filetype — so
-`<leader>rr` pressed in the wrong order sends code into a second nvim. Refuse
-self/nvim windows.
+`win.is_self` and `cmdline[1] ~= "nvim"` (`detect.lua:51`), but on failure
+`attach` keeps the bad `repl_win` with a nil identity — so `<leader>rr` pressed in
+the wrong order sends code into a second nvim. Refuse self/nvim windows.
+
+## Resolve the program once, then ask who claims it
+
+Split the two questions `config.match.detect.*` currently answers together:
+*what program runs in this window* (one function, no filetype) and *does this
+filetype claim it* (a per-filetype set of program names). The registry is where
+the first belongs, since `repl.cmd(win)` already has to answer it without a
+buffer in hand.
+
+This subsumes three special cases that all encode the same shape — an interpreter
+in `cmdline[1]`, the real program named by `cmdline[2]`:
+
+| cmdline | program | handled today in |
+|---|---|---|
+| `[python3, .../radian]` | radian | `detect.r` |
+| `[python3, .../ipython]` | ipython | `detect.python` |
+| `[python, .../pymol/__init__.py, -xpq]` | pymol | `detect.python` |
+
+Keeping them per-filetype means the same window gets two names depending on who
+asks — `detect.python` on a radian window returns `python`, so a python buffer
+claims it and sends stock-python linewise. That is 02's bug reached through the
+other filetype, and each further python-launched REPL (jupyter console, ptpython,
+bpython) adds another arm.
+
+Four cases a basename rule gets wrong, so resolution needs its own tests:
+pymol's entrypoint basename is `__init__.py`, not `pymol`; `ipython3` and
+`python3` need the version suffix dropped; `-i`/`-m` sit where an entrypoint path
+is expected; and `python3 train.py` resolves to `train`, which no config table
+knows. Returning nil for that last one is better than today's `python` — decide
+it explicitly, because it stops such a window being claimable at all.
+
+## Test
+
+Program resolution is pure `(cmdline, title) -> name|nil` and keeps
+`tests/plenary/detect_spec.lua`, whose fixtures are real `kitty @ ls` values —
+extend it with the four cases above rather than starting a second spec. Per-filetype
+claiming is a table lookup and needs no test of its own.
 
 ## Verify
 
 - `make test` passes
 - Launch radian with `<leader>rs`, then attach a second buffer to the same window
   with `<leader>rr` — both report the same identity and both send bracketed
+- `<leader>rr` from a python buffer with a radian window on the tab declines it
+  instead of claiming it as stock python
 - `<leader>rr` with another nvim as the last active window refuses instead of
   binding
-- `set`/`setI` produce a working REPL with correct paste behaviour, where before
-  they left identity nil
+- `set`/`setI` produce a working REPL with correct paste behaviour
 
 ## Ordering
 

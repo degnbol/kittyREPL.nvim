@@ -1,4 +1,14 @@
 -- Default configuration for kittyREPL
+--
+-- The per-language tables below are keyed on one of two axes. Which one is not
+-- visible at a call site, so it is recorded per table:
+-- * filetype, i.e. the file being edited:
+--   exclude, command, command_count, match.detect
+-- * program, i.e. what runs in the REPL window:
+--   bracketed, linewise, custom, match.prompt, match.help
+-- match.detect bridges the two: it is keyed by filetype and returns a program
+-- name. A program name and a filetype coincide for some languages (julia, lua)
+-- and differ for others (an r buffer drives radian).
 local M = {
     -- Set keymaps in setup call or map something to these <plug> maps.
     keymap = {
@@ -37,11 +47,14 @@ local M = {
     progress = true,    -- should the cursor progress after a command is run?
     editpaste = false,  -- should we immediately go to REPL when pasting?
     closepager = false, -- autoclose pager if open when running/pasting
-    -- not all REPLs support bracketed paste.
+    -- Program-keyed. Not all REPLs support bracketed paste.
     -- stock python repl is particularly bad. It doesn't support bracketed, it
     -- can't handle empty line within indentation, it doesn't understand the
     -- SOH code.
+    -- stock R echoes the bracketed paste markers as literal text ("00~", "01~")
+    -- and then fails to parse the block; it takes multiline raw sends fine.
     bracketed = { ipython = true, python = false, radian = true, r = false, julia = true, pymol = false, pml = false },
+    -- Program-keyed.
     -- Stock python REPL writes "..." too slow when running multiple lines.
     -- This "linewise" config enables splitting multiline messages by newlines
     -- and sends them one at a time. Still skipping empty newlines or adding
@@ -67,17 +80,19 @@ local M = {
     match = {
         -- kitty @ ls foreground_processes cmdline value to recognize for auto finding REPL for the buffer.
         -- over SSH the foreground_processes.cmdline will simply be ["ssh", ...] so we also detect using title
-        -- filetype -> function(cmdline, title) -> nil or REPL name
+        -- filetype -> function(cmdline, title) -> nil or program name
+        ---@type table<string, fun(cmdline: string[]|nil, title: string): string|nil>
         detect = {
             sh = function(cmdline)
                 if not cmdline or not cmdline[1] then return end
-                local shell = cmdline[1]:match("[%w]+$")
+                -- matches both "/bin/zsh" and a login shell's "-zsh"
+                local shell = cmdline[1]:match("%w+$")
                 if shell == "zsh" then return "zsh"
                 elseif shell == "bash" then return "bash"
                 elseif shell == "sh" then return "sh"
                 end
             end,
-            julia = function(cmdline, title)
+            julia = function(cmdline)
                 if not cmdline or not cmdline[1] then return end
                 -- ["/usr/local/bin/julia", "-t", "4"] -> julia
                 if cmdline[1]:match("[%w.]+$") == "julia" then
@@ -89,9 +104,14 @@ local M = {
                     return "ipython"
                 end
                 if not cmdline or not cmdline[1] then return end
-                -- ["/opt/homebrew/.../pymol/__init__.py"] -> pymol
+                -- [".../python", ".../pymol/__init__.py", "-xpq"] -> pymol
                 if cmdline[2] and cmdline[2]:match("/pymol/__init__.py$") then
                     return "pymol"
+                end
+                -- [".../ipython/bin/python3", ".../bin/ipython"] -> ipython.
+                -- The title check above misses a window we retitled ourselves.
+                if cmdline[2] and cmdline[2]:match("/ipython3?$") then
+                    return "ipython"
                 end
                 -- [".../python3"] -> python
                 local firstword = cmdline[1]:match("[%w.]+$")
@@ -105,17 +125,17 @@ local M = {
             end,
             r = function(cmdline)
                 if not cmdline or not cmdline[1] then return end
-                -- [".../R"] -> r
+                -- [".../bin/exec/R", "--no-save"] -> r
                 if cmdline[1]:match("[%w.]+$") == "R" then
                     return "r"
                 end
-                -- ["../Python", ".../radian"] -> r
+                -- [".../python3", ".../radian", "--r-binary", ...] -> radian
                 if cmdline[2] and cmdline[2]:match("[%w.]+$") == "radian" then
-                    return "r"
+                    return "radian"
                 end
             end,
         },
-        -- patterns to match for prompt start and continuation for each supported REPL program
+        -- Program-keyed patterns to match for prompt start and continuation.
         prompt = {
             -- this will not understand pkg prompts on the form (ENV) pkg>
             -- This should be fine for grabbing cmd inputs but not for grabbing
@@ -131,8 +151,8 @@ local M = {
             lua = { "> ", ">> " },
             pymol = { "", "" },
         },
-        -- Help command by REPL command and context, often a "?" prefix.
-        -- For each REPL command provide either a help command prefix string, a two element array with prefix and suffix,
+        -- Program-keyed help command, often a "?" prefix.
+        -- For each program provide either a help command prefix string, a two element array with prefix and suffix,
         -- or a key-value table where each key will be matched against the last prompt (from first to last key).
         -- E.g. julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
         help = {
@@ -142,6 +162,7 @@ local M = {
             r = "?",
             ipython = "?",
             python = { "help(", ")" },
+            pymol = "help ", -- "?" is a syntax error in pymol
             lua = "", -- no help available
         },
     },

@@ -12,7 +12,7 @@ chain — each plan states its own dependencies.
 |---|---|---|
 | 00 ✓ | Commit the working tree | — |
 | 01 ✓ | Crash fixes and dead code | 00 |
-| 02 | [One program-name namespace](plans/02-program-namespace.md) | 01 |
+| 02 ✓ | [One program-name namespace](plans/02-program-namespace.md) | 01 |
 | 03 | [Treesitter loop-variable extraction](plans/03-iterate-treesitter.md) | 01 |
 | 04 | [REPL registry](plans/04-repl-registry.md) | 02, 03 |
 | 05 | [Transport seam](plans/05-transport-seam.md) | 04 |
@@ -20,11 +20,15 @@ chain — each plan states its own dependencies.
 | 07 | [`setup()` hygiene](plans/07-setup-hygiene.md) | 05 |
 | 08 | [README](plans/08-readme.md) | 02, 04, 05, 07 |
 | 09 | [REPL context sync](plans/09-context-sync.md) | 02, 04 |
+| 10 | [Launch environment](plans/10-launch-env.md) | — |
+| 11 | [Runtime prompt detection](plans/11-prompt-detection.md) | 04, 05 |
 
 02 fixes a live radian paste bug on its own — land it early even if the rest
 stalls. 03 is self-contained; running it before 04 keeps `commands.lua` still
 while the registry lands. 09 opens with an experiment whose result decides part of
-its own design.
+its own design. 10 is one flag and one default with no dependencies; it can land
+at any point. 11 deletes `config.match.prompt`, which fixes `[r`/`]r` in radian
+and julia and removes 07's prompt-anchoring item.
 
 ## Unplanned
 

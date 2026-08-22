@@ -81,7 +81,7 @@ gate, and attaching is explicit.
 
 ## Where it hooks in
 
-All code delivery funnels through `kitty.send` (`kitty.lua:120`) via `kitty.run`
+All code delivery funnels through `kitty.send` (`kitty.lua`) via `kitty.run`
 and `kitty.paste`. Dispatch from the `run`/`paste` wrappers in `commands.lua`
 that task 06 introduces for the pager probe:
 
@@ -94,12 +94,14 @@ local function run(text, raw)
 end
 ```
 
-Then `kitty.run(` → `run(` throughout `commands.lua` — exactly 10 sites
-(`commands.lua:109,119,132,147,156,165,179,193,203,212`). Dependency direction is
-`commands → context → kitty`.
+Then `kitty.run(` → `run(` throughout `commands.lua` — re-derive the call sites
+with `grep -n 'kitty\.\(run\|paste\)(' lua/kittyREPL/commands.lua` rather than
+working from a fixed list; tasks 03 and 05 both rewrite these lines. Dependency
+direction is `commands → context → kitty`.
 
 Do not dispatch from `detect.replCheck`: it wraps every REPL keymap
-(`init.lua:104-126`) including `focus`, `interrupt` and scrollback, and syncing
+(the `nmap`/`xmap` block in `init.lua`) including `focus`, `interrupt` and
+scrollback, and syncing
 before an interrupt is wrong. Do not dispatch inside `kitty.send`: `context` must
 call `kitty` to send, so that is a cycle. Do not add a `send.lua` — see
 `design.md` § Transport.

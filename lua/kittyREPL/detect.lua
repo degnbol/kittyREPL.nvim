@@ -19,9 +19,7 @@ function M.detect_REPL(wins)
     end
     if wins == nil then
         if detect == nil then
-            print("No detect config for " ..
-                vim.bo.filetype .. ". Can't detect window and assumes REPL command is \"" .. vim.bo.filetype .. "\".")
-            vim.b.repl_cmd = vim.bo.filetype
+            print("No detect config for " .. vim.bo.filetype .. ". Set the REPL window manually.")
             return
         end
         local focused_tab = kitty.get_focused_tab()
@@ -53,9 +51,10 @@ function M.detect_REPL(wins)
         if not win.is_self and cmdline[1] ~= "nvim" then
             -- no detection config, but we are specifying exactly which window the REPL is in
             if detect == nil and #wins == 1 then
-                vim.b.repl_cmd = table.concat(cmdline, " ")
+                -- the basename is a guess at the program name; the full cmdline never is
+                vim.b.repl_cmd = vim.fn.fnamemodify(cmdline[1], ":t"):lower()
                 vim.b.repl_win = win.id
-                print("No detect config for " .. vim.bo.filetype .. ". Assumes REPL command is \"" .. vim.b.repl_cmd .. "\".")
+                print("No detect config for " .. vim.bo.filetype .. ". Assumes REPL program is \"" .. vim.b.repl_cmd .. "\".")
                 return win.id
             end
             local repl_cmd = detect(cmdline, win.title)
