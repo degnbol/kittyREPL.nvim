@@ -186,4 +186,20 @@ function M.get_index()
     return iScrollback
 end
 
+---Paste last REPL command output as comments.
+---@param after boolean insert after cursor line (true) or before (false)
+function M.pasteOutput(after)
+    local text = kitty.get_last_output()
+    if not text then
+        print("No output")
+        return
+    end
+    local cs = vim.bo.commentstring
+    local outLines = vim.split(text:gsub("\n$", ""), "\n")
+    for i, line in ipairs(outLines) do
+        outLines[i] = cs:format(line)
+    end
+    vim.api.nvim_put(outLines, "l", after, false)
+end
+
 return M

@@ -122,6 +122,8 @@ function M.setup(userconfig)
             nmap(c.keymap.scrollStart, detect.replCheck(scrollback.startScroll), "REPL paste from scrollback")
             xmap(c.keymap.scrollUp, detect.replCheck(scrollback.replaceScroll(1)), "REPL paste older scrollback")
             xmap(c.keymap.scrollDown, detect.replCheck(scrollback.replaceScroll(-1)), "REPL paste newer scrollback")
+            nmap(c.keymap.scrollOutputAbove, detect.replCheck(function() scrollback.pasteOutput(false) end), "REPL paste output above")
+            nmap(c.keymap.scrollOutputBelow, detect.replCheck(function() scrollback.pasteOutput(true) end), "REPL paste output below")
             nmap(c.keymap.progress, commands.toggleProgress, "REPL toggle progress")
             nmap(c.keymap.editPaste, commands.toggleEditPaste, "REPL toggle edit paste")
         end

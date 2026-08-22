@@ -25,6 +25,8 @@ local M = {
         scrollDown  = "<plug>kittyReplScrollDown",
         progress    = "<plug>kittyReplToggleProgress",
         editPaste   = "<plug>kittyReplToggleEditPaste",
+        scrollOutputAbove = "<plug>kittyReplScrollOutputAbove",
+        scrollOutputBelow = "<plug>kittyReplScrollOutputBelow",
     },
     -- Disable plugin for these filetypes:
     exclude = {

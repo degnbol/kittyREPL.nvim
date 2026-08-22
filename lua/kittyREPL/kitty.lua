@@ -197,6 +197,17 @@ function M.get_scrollback()
     return text
 end
 
+---Get last command output from the REPL (requires kitty shell integration).
+---@return string?
+function M.get_last_output()
+    local fh = io.popen("kitty @ get-text --extent=last_cmd_output --match id:" .. vim.b.repl_win)
+    if not fh then return end
+    local text = fh:read("*a")
+    fh:close()
+    if text == "" then return end
+    return text
+end
+
 ---Send a SIGINT to the REPL.
 ---@return boolean
 function M.interrupt()
