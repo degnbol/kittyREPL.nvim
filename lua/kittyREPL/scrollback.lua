@@ -61,25 +61,26 @@ function M.parseHistoryText(text)
     return entries
 end
 
----Read shell history file and return entries (most recent first).
----@return table[]
-local function readHistory()
-    local cmd = vim.b.repl_cmd
+---Path of the history file for a shell.
+---@param shell string
+---@return string
+local function histfile(shell)
     -- HISTFILE is a shell variable (not exported), so os.getenv usually returns nil.
     -- Fall back to conventional paths.
-    local histfile = os.getenv("HISTFILE")
-    if not histfile then
-        if cmd == "zsh" then
-            histfile = os.getenv("HOME") .. "/.zsh_history"
-        else
-            histfile = os.getenv("HOME") .. "/.bash_history"
-        end
+    return os.getenv("HISTFILE")
+        or os.getenv("HOME") .. (shell == "zsh" and "/.zsh_history" or "/.bash_history")
+end
+
+---Read the tail of a shell history file as entries (most recent first).
+---@param path string
+---@return table[]
+function M.readHistory(path)
+    local ok, result = pcall(vim.fn.readfile, path, "", -500)
+    if not ok then
+        vim.notify("kittyREPL: " .. result, vim.log.levels.WARN)
+        return {}
     end
-    local fh = io.popen("tail -n 500 " .. vim.fn.shellescape(histfile))
-    if not fh then return {} end
-    local text = fh:read("*a")
-    fh:close()
-    return M.parseHistoryText(text)
+    return M.parseHistoryText(table.concat(result, "\n"))
 end
 
 ---Read the raw scrollback text and reset parsing state.
@@ -87,7 +88,7 @@ function M.read()
     tScrollback = {}
     iScrollback = 0
     if shells[vim.b.repl_cmd] then
-        tScrollback = readHistory()
+        tScrollback = M.readHistory(histfile(vim.b.repl_cmd))
         scrollback = ""
     else
         scrollback = kitty.get_scrollback() or ""
@@ -97,7 +98,12 @@ end
 ---Parse one command entry from the scrollback text and truncate the text afterwards.
 ---@return table? lines array of command lines
 local function parseScrollback()
-    local pat, patCont = unpack(config.match.prompt[vim.b.repl_cmd])
+    local prompt = config.match.prompt[vim.b.repl_cmd]
+    if not prompt then
+        vim.notify("kittyREPL: no prompt pattern for REPL " .. tostring(vim.b.repl_cmd), vim.log.levels.WARN)
+        return
+    end
+    local pat, patCont = unpack(prompt)
     local lines = {}
     while true do
         local lastline = scrollback:match("\n([^\n]*)$")
@@ -175,15 +181,10 @@ function M.replaceScroll(delta)
         -- edge case where replaceScroll is called before startScroll
         if iScrollback == 0 then M.read() end
         local rcmd = M.scroll(delta)
+        if rcmd == nil then return end
         vim.fn.setreg("k", rcmd)
         vim.cmd.normal('"kpv`[o')
     end
-end
-
----Get the current scrollback index.
----@return integer
-function M.get_index()
-    return iScrollback
 end
 
 ---Paste last REPL command output as comments.

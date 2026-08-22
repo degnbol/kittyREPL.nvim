@@ -54,6 +54,7 @@ function M.detect_REPL(wins)
             -- no detection config, but we are specifying exactly which window the REPL is in
             if detect == nil and #wins == 1 then
                 vim.b.repl_cmd = table.concat(cmdline, " ")
+                vim.b.repl_win = win.id
                 print("No detect config for " .. vim.bo.filetype .. ". Assumes REPL command is \"" .. vim.b.repl_cmd .. "\".")
                 return win.id
             end

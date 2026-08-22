@@ -69,7 +69,7 @@ local M = {
         -- over SSH the foreground_processes.cmdline will simply be ["ssh", ...] so we also detect using title
         -- filetype -> function(cmdline, title) -> nil or REPL name
         detect = {
-            sh = function(cmdline, _title)
+            sh = function(cmdline)
                 if not cmdline or not cmdline[1] then return end
                 local shell = cmdline[1]:match("[%w]+$")
                 if shell == "zsh" then return "zsh"
@@ -103,7 +103,7 @@ local M = {
                     return "python"
                 end
             end,
-            r = function(cmdline, title)
+            r = function(cmdline)
                 if not cmdline or not cmdline[1] then return end
                 -- [".../R"] -> r
                 if cmdline[1]:match("[%w.]+$") == "R" then
@@ -112,10 +112,6 @@ local M = {
                 -- ["../Python", ".../radian"] -> r
                 if cmdline[2] and cmdline[2]:match("[%w.]+$") == "radian" then
                     return "r"
-                end
-                -- "server-name: julia" -> julia
-                if title:match("[%w.]+$") == "julia" then
-                    return "julia"
                 end
             end,
         },

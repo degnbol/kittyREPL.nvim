@@ -114,3 +114,38 @@ describe("parseHistoryText", function()
         assert.are.same({ "first" }, entries[3])
     end)
 end)
+
+describe("readHistory", function()
+    local function write(lines)
+        local path = vim.fn.tempname()
+        vim.fn.writefile(lines, path)
+        return path
+    end
+
+    it("reads entries most recent first", function()
+        local entries = scrollback.readHistory(write({ "ls", ": 1700000000:0;pwd" }))
+        assert.are.equal(2, #entries)
+        assert.are.same({ "pwd" }, entries[1])
+        assert.are.same({ "ls" }, entries[2])
+    end)
+
+    it("reads at most the last 500 lines", function()
+        local lines = {}
+        for i = 1, 600 do lines[i] = "echo " .. i end
+        local entries = scrollback.readHistory(write(lines))
+        assert.are.equal(500, #entries)
+        assert.are.same({ "echo 600" }, entries[1])
+        assert.are.same({ "echo 101" }, entries[500])
+    end)
+
+    it("notifies and returns nothing for an unreadable file", function()
+        local notified
+        local notify = vim.notify
+        ---@diagnostic disable-next-line: duplicate-set-field
+        vim.notify = function(msg) notified = msg end
+        local entries = scrollback.readHistory("/nonexistent/history")
+        vim.notify = notify
+        assert.are.same({}, entries)
+        assert.is_truthy(notified)
+    end)
+end)

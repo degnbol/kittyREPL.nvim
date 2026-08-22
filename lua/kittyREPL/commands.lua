@@ -63,22 +63,23 @@ end
 ---Launch a new REPL window.
 ---vim.v.count used as well, e.g. to use multiple threads.
 function M.new()
-    -- default to zsh
-    local ftcommand = config.command[vim.bo.filetype] or ""
+    -- filetypes without a command entry fall back to the shell
+    local ftcommand = config.command[vim.bo.filetype] or vim.o.shell
     if vim.v.count > 0 then
         local ftcommand_count = config.command_count[vim.bo.filetype]
         if ftcommand_count ~= nil then
             ftcommand = ftcommand .. ftcommand_count .. vim.v.count
         end
     end
+    -- derived before launching so a bad command cannot leave an untitled window behind
+    local program = fn.fnamemodify(ftcommand:match("[^ ]+"), ":t"):lower()
     local win = kitty.launch(ftcommand)
     if not win then return end
     -- show id in the title so we can easily set it as target, but also start
     -- with the cmd like it would have been named if opened in a regular way.
-    local title = ftcommand:match("[^ ]+") .. " id=" .. win
-    kitty.set_title(win, title)
+    kitty.set_title(win, program .. " id=" .. win)
     vim.b.repl_win = win
-    vim.b.repl_cmd = ftcommand:match("[^ ]+"):lower()
+    vim.b.repl_cmd = program
 end
 
 ---Manually set REPL as ith visible window from a prompt.

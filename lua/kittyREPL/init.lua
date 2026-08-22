@@ -32,13 +32,6 @@ function ReplPasteOperator(type)
     commands.pasteOperator(type)
 end
 
--- Expose some functions globally for backwards compatibility
--- These can be called from user configs
-ReplNew = commands.new
-ReplSetI = commands.setI
-ReplToggleProgress = commands.toggleProgress
-ReplToggleEditPaste = commands.toggleEditPaste
-
 ---Setup kittyREPL with optional user configuration.
 ---@param userconfig table?
 function M.setup(userconfig)

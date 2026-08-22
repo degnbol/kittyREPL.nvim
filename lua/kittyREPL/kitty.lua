@@ -37,22 +37,6 @@ function M.get_focused_tab()
     end
 end
 
----Get window by repl_id from vim.b.
----@return table?
-function M.get_repl_win()
-    local ls = M.ls()
-    if not ls then return end
-    for _, os_win in ipairs(ls) do
-        for _, tab in ipairs(os_win.tabs) do
-            for _, win in ipairs(tab.windows) do
-                if win.id == vim.b.repl_id then
-                    return win
-                end
-            end
-        end
-    end
-end
-
 ---Get window id of the ith window visible on the current tab.
 ---@param i integer
 ---@return integer?
