@@ -10,7 +10,7 @@ chain — each plan states its own dependencies.
 
 | | Task | Depends on |
 |---|---|---|
-| 00 | [Commit the working tree](plans/00-commit-worktree.md) | — |
+| 00 ✓ | [Commit the working tree](plans/00-commit-worktree.md) | — |
 | 01 | [Crash fixes and dead code](plans/01-crash-fixes.md) | 00 |
 | 02 | [One program-name namespace](plans/02-program-namespace.md) | 01 |
 | 03 | [Treesitter loop-variable extraction](plans/03-iterate-treesitter.md) | 01 |
