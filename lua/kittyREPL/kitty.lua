@@ -3,11 +3,6 @@ local M = {}
 
 local config = require("kittyREPL.config")
 
----Get repo root (for bracketedPaste.sh).
-local function ROOT()
-    return debug.getinfo(1).source:match("@?(.*/)") .. '/..'
-end
-
 ---Parse kitty @ ls output into table.
 ---@param match string? optionally filter with --match argument
 ---@return table?
@@ -94,9 +89,9 @@ end
 ---@param text string
 ---@param post string
 function M.send_bracketed(text, post)
-    local fh = io.popen(ROOT() .. '/bracketedPaste.sh ' .. vim.b.repl_win .. ' "' .. post .. '"', "w")
+    local fh = io.popen("kitty @ send-text --stdin --match id:" .. vim.b.repl_win, "w")
     if not fh then return end
-    fh:write(text)
+    fh:write("\x1b[200~" .. text .. "\x1b[201~" .. post)
     fh:close()
 end
 
