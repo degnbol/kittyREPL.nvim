@@ -9,11 +9,89 @@ local scrollback = ""
 local tScrollback = {}
 local iScrollback = 0
 
+local shells = { zsh = true, bash = true, sh = true }
+
+---Check if line ends with an odd number of backslashes (i.e. a continuation).
+---Even trailing backslashes are escaped literals, not continuations.
+---@param line string
+---@return boolean
+local function is_continuation(line)
+    local n = 0
+    for j = #line, 1, -1 do
+        if line:sub(j, j) == "\\" then n = n + 1
+        else break end
+    end
+    return n % 2 == 1
+end
+
+---Parse shell history text into entries (most recent first).
+---Each entry is a table of lines, matching parseScrollback() format.
+---Handles zsh extended history (: timestamp:duration;cmd), plain history,
+---bash #timestamp lines, and backslash-newline continuations.
+---@param text string raw history file content
+---@return table[]
+function M.parseHistoryText(text)
+    local entries = {}
+    local lines = vim.split(text, "\n", { trimempty = true })
+
+    -- Parse from end to start, collecting entries most-recent-first
+    local i = #lines
+    while i >= 1 do
+        local line = lines[i]
+        -- zsh extended history: ": timestamp:duration;command"
+        local entry = line:match("^: %d+:%d+;(.+)") or line
+        -- bash HISTTIMEFORMAT: skip bare "#timestamp" lines
+        if entry:match("^#%d+$") then
+            i = i - 1
+            goto continue
+        end
+        -- join backslash-continuation lines (odd trailing backslashes = continuation)
+        while i > 1 and is_continuation(lines[i - 1]) do
+            i = i - 1
+            local prev = lines[i]
+            prev = prev:match("^: %d+:%d+;(.+)") or prev
+            -- strip trailing continuation backslash and join
+            entry = prev:sub(1, -2) .. "\n" .. entry
+        end
+        local entryLines = vim.split(entry, "\n")
+        table.insert(entries, entryLines)
+        i = i - 1
+        ::continue::
+    end
+    return entries
+end
+
+---Read shell history file and return entries (most recent first).
+---@return table[]
+local function readHistory()
+    local cmd = vim.b.repl_cmd
+    -- HISTFILE is a shell variable (not exported), so os.getenv usually returns nil.
+    -- Fall back to conventional paths.
+    local histfile = os.getenv("HISTFILE")
+    if not histfile then
+        if cmd == "zsh" then
+            histfile = os.getenv("HOME") .. "/.zsh_history"
+        else
+            histfile = os.getenv("HOME") .. "/.bash_history"
+        end
+    end
+    local fh = io.popen("tail -n 500 " .. vim.fn.shellescape(histfile))
+    if not fh then return {} end
+    local text = fh:read("*a")
+    fh:close()
+    return M.parseHistoryText(text)
+end
+
 ---Read the raw scrollback text and reset parsing state.
 function M.read()
-    scrollback = kitty.get_scrollback() or ""
     tScrollback = {}
     iScrollback = 0
+    if shells[vim.b.repl_cmd] then
+        tScrollback = readHistory()
+        scrollback = ""
+    else
+        scrollback = kitty.get_scrollback() or ""
+    end
 end
 
 ---Parse one command entry from the scrollback text and truncate the text afterwards.
