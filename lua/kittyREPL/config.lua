@@ -67,6 +67,14 @@ local M = {
         -- over SSH the foreground_processes.cmdline will simply be ["ssh", ...] so we also detect using title
         -- filetype -> function(cmdline, title) -> nil or REPL name
         detect = {
+            sh = function(cmdline, _title)
+                if not cmdline or not cmdline[1] then return end
+                local shell = cmdline[1]:match("[%w]+$")
+                if shell == "zsh" then return "zsh"
+                elseif shell == "bash" then return "bash"
+                elseif shell == "sh" then return "sh"
+                end
+            end,
             julia = function(cmdline, title)
                 if not cmdline or not cmdline[1] then return end
                 -- ["/usr/local/bin/julia", "-t", "4"] -> julia
@@ -140,5 +148,8 @@ local M = {
         },
     },
 }
+
+M.match.detect.zsh = M.match.detect.sh
+M.match.detect.bash = M.match.detect.sh
 
 return M

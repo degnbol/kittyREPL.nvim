@@ -11,6 +11,12 @@ local kitty = require("kittyREPL.kitty")
 ---@return integer?
 function M.detect_REPL(wins)
     local detect = config.match.detect[vim.bo.filetype]
+    if not detect then
+        for ft in vim.bo.filetype:gmatch("[^.]+") do
+            detect = config.match.detect[ft]
+            if detect then break end
+        end
+    end
     if wins == nil then
         if detect == nil then
             print("No detect config for " ..
