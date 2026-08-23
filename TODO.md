@@ -17,7 +17,7 @@ chain — each plan states its own dependencies.
 | 04 ✓ | [REPL registry](plans/04-repl-registry.md) | 02, 03 |
 | 05 ✓ | [Transport seam](plans/05-transport-seam.md) | 04 |
 | 06 ✓ | [Pager probe](plans/06-pager-probe.md) | 05 |
-| 07 | [`setup()` hygiene](plans/07-setup-hygiene.md) | 05 |
+| 07 ✓ | [`setup()` hygiene](plans/07-setup-hygiene.md) | 05 |
 | 08 | [README](plans/08-readme.md) | 02, 04, 05, 07 |
 | 09 | [REPL context sync](plans/09-context-sync.md) | 02, 04 |
 | 10 | [Launch environment](plans/10-launch-env.md) | — |
@@ -28,7 +28,7 @@ stalls. 03 is self-contained; running it before 04 keeps `commands.lua` still
 while the registry lands. 09 opens with an experiment whose result decides part of
 its own design. 10 is one flag and one default with no dependencies; it can land
 at any point. 11 deletes `config.match.prompt`, which fixes `[r`/`]r` in radian
-and julia and removes 07's prompt-anchoring item.
+and julia.
 
 ## Unplanned
 

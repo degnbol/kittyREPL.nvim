@@ -5,6 +5,7 @@ local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local repl = require("kittyREPL.repl")
 local binding = require("kittyREPL.binding")
+local message = require("kittyREPL.message")
 
 local cmd = vim.cmd
 local fn = vim.fn
@@ -145,7 +146,7 @@ function M.iterateExpr(ft, key, iterable, count)
     local spec = config.iterate[ft]
     local index = count or (spec or {}).base
     if not spec or not spec[key] or (key == "index" and not index) then
-        vim.notify("REPL: no iterate." .. key .. " expression for " .. ft, vim.log.levels.WARN)
+        message.warn("no iterate." .. key .. " expression for " .. ft)
         return
     end
     return spec[key]:format(iterable, index)
@@ -158,7 +159,7 @@ local function runBinding(key, count)
     local cursor = vim.api.nvim_win_get_cursor(0)
     local variable, iterable, nextpos = binding.at(0, cursor[1] - 1, cursor[2])
     if not variable or not iterable then
-        vim.notify("REPL: no loop binding found at the cursor", vim.log.levels.WARN)
+        message.warn("no loop binding found at the cursor")
         return
     end
     local expr = M.iterateExpr(vim.bo.filetype, key, iterable, count)
@@ -277,13 +278,13 @@ end
 ---Toggle cursor progress after commands.
 function M.toggleProgress()
     config.progress = not config.progress
-    print("REPL progress =", config.progress)
+    message.status("progress = " .. tostring(config.progress))
 end
 
 ---Toggle edit paste mode.
 function M.toggleEditPaste()
     config.editpaste = not config.editpaste
-    print("REPL edit paste =", config.editpaste)
+    message.status("edit paste = " .. tostring(config.editpaste))
 end
 
 return M

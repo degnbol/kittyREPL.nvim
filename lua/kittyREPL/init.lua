@@ -48,35 +48,6 @@ function M.setup(userconfig)
         end
     end
 
-    -- Set up custom send functions that need access to kitty module
-    config.custom.pymol = function(win, text, post)
-        -- wrap multiline in python .. python end
-        -- https://pymolwiki.org/index.php/PythonTerminal
-        if text:match('\n') then
-            kitty.send_raw(win, "python\n" .. text:gsub("\n*$", "") .. "\npython end" .. post)
-        else
-            kitty.send_raw(win, text .. post)
-        end
-    end
-    config.custom.lua = function(win, text, post)
-        -- top level locals are ignored in REPL so we strip that.
-        kitty.send_raw(win, text:gsub("^local ", ""):gsub("\nlocal ", "\n") .. post)
-    end
-    config.custom.julia = function(win, text, post)
-        -- Fixed a huge problem, super weird, julia was insanely slow typing one char at a time.
-        -- I realised it was because even though we set it to use bracketed it only sends it bracketed with multiline.
-        -- Solution here: always send bracketed.
-        kitty.send_bracketed(win, text, post)
-    end
-
-    -- Transform prompt patterns to match from start of line (only once)
-    for k, v in pairs(config.match.prompt) do
-        if not v[1]:match("^%^") then
-            config.match.prompt[k][1] = "^" .. v[1] .. "()"
-            config.match.prompt[k][2] = "^" .. v[2] .. "()"
-        end
-    end
-
     local group = vim.api.nvim_create_augroup("kittyRepl", { clear = true })
     -- BufEnter is too early for e.g. cmdline window to assign buftype
     vim.api.nvim_create_autocmd("FileType", {

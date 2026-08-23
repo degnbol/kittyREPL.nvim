@@ -101,11 +101,12 @@ Re-learn when the cached pattern matches zero lines, which is how a mode switch
 `scrollback.read`, not at attach: `kitty @ launch` returns before the prompt is
 drawn. A refusal must not be cached as a failure.
 
-### 4. Delete `config.match.prompt` and the `init.lua:71-76` rewrite
+### 4. Delete `config.match.prompt` and scrollback.lua's `anchoredPrompt`
 
 The learned pattern already carries `^` and the `()` position capture, so
-`parseScrollback`'s `lastline:sub(mPrompt)` is unchanged, and plan 07's "move the
-prompt anchoring out of `setup()`" is satisfied by deletion. Drop the totality
+`parseScrollback`'s `lastline:sub(mPrompt)` is unchanged and 07's anchoring
+helper has nothing left to anchor. `M.scroll` resolves the patterns once and
+passes them in, so that is where the learned pattern is read. Drop the totality
 assertion in `tests/plenary/repl_spec.lua` with it.
 
 Add `config.prompt = {}` — a program-keyed override, empty by default, for a REPL

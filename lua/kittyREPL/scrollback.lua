@@ -4,6 +4,7 @@ local M = {}
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local repl = require("kittyREPL.repl")
+local message = require("kittyREPL.message")
 
 -- Module state
 local scrollback = ""
@@ -78,7 +79,7 @@ end
 function M.readHistory(path)
     local ok, result = pcall(vim.fn.readfile, path, "", -500)
     if not ok then
-        vim.notify("kittyREPL: " .. result, vim.log.levels.WARN)
+        message.warn(result)
         return {}
     end
     return M.parseHistoryText(table.concat(result, "\n"))
@@ -98,15 +99,21 @@ function M.read(win, program)
     end
 end
 
----Parse one command entry from the scrollback text and truncate the text afterwards.
+---Prompt and continuation patterns for a program, anchored to the line start and
+---ending in a position capture, i.e. the column the command text begins at.
+---config.match.prompt holds them bare so that it reads as what a user writes.
 ---@param program string|nil
----@return table? lines array of command lines
-local function parseScrollback(program)
+---@return string[]|nil
+local function anchoredPrompt(program)
     local prompt = config.match.prompt[program]
-    if not prompt then
-        vim.notify("kittyREPL: no prompt pattern for REPL " .. tostring(program), vim.log.levels.WARN)
-        return
-    end
+    if not prompt then return end
+    return { "^" .. prompt[1] .. "()", "^" .. prompt[2] .. "()" }
+end
+
+---Parse one command entry from the scrollback text and truncate the text afterwards.
+---@param prompt string[] anchored prompt and continuation patterns
+---@return table? lines array of command lines
+local function parseScrollback(prompt)
     local pat, patCont = unpack(prompt)
     local lines = {}
     while true do
@@ -136,6 +143,11 @@ end
 ---@param program string|nil
 ---@return table? lines array of command lines
 function M.scroll(delta, program)
+    local prompt = anchoredPrompt(program)
+    if not prompt then
+        message.warn("no prompt pattern for " .. tostring(program))
+        return
+    end
     if vim.v.count ~= 0 then
         delta = delta * vim.v.count
     end
@@ -145,9 +157,9 @@ function M.scroll(delta, program)
                 -- skip empty prompts
                 local rcmd = { "" }
                 while table.concat(rcmd) == "" do
-                    rcmd = parseScrollback(program)
+                    rcmd = parseScrollback(prompt)
                     if rcmd == nil then
-                        print("REPL top")
+                        message.status("top of scrollback")
                         return tScrollback[iScrollback]
                     end
                 end
@@ -155,15 +167,15 @@ function M.scroll(delta, program)
             end
             iScrollback = iScrollback + 1
         end
-        print(iScrollback)
+        message.status("entry " .. iScrollback)
         return tScrollback[iScrollback]
     else
         iScrollback = iScrollback + delta
         if iScrollback < 1 then
             iScrollback = 1
-            print("REPL bottom")
+            message.status("bottom of scrollback")
         else
-            print(iScrollback)
+            message.status("entry " .. iScrollback)
         end
         return tScrollback[iScrollback]
     end
@@ -203,7 +215,7 @@ function M.pasteOutput(after)
     if not win then return end
     local text = kitty.get_last_output(win)
     if not text then
-        print("No output")
+        message.warn("no output to paste")
         return
     end
     local cs = vim.bo.commentstring

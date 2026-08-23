@@ -1,7 +1,6 @@
 ---@diagnostic disable: undefined-global
 -- The send path with kitty's subprocess replaced, so the bytes a REPL receives
 -- are asserted rather than eyeballed in a terminal.
-require("kittyREPL").setup() -- populates config.custom
 local kitty = require("kittyREPL.kitty")
 local config = require("kittyREPL.config")
 
@@ -166,7 +165,7 @@ describe("kitty command failure", function()
             return { code = 1, stdout = "", stderr = "Error: No listening socket\n" }
         end
         assert.is_nil(kitty.get_scrollback(WIN))
-        assert.are.equal("kittyREPL: Error: No listening socket", notified)
+        assert.are.equal("REPL: Error: No listening socket", notified)
     end)
 
     it("reports a kitty binary it cannot spawn, where vim.system raises", function()

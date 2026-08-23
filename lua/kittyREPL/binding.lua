@@ -6,6 +6,8 @@
 -- Rows and columns are (0,0)-indexed throughout, as in the treesitter API.
 local M = {}
 
+local message = require("kittyREPL.message")
+
 --- A binding spans from the start of its variable to the end of its iterable,
 --- which is the header of a loop rather than the loop with its body.
 --- @class kittyREPL.Binding
@@ -121,13 +123,13 @@ end
 local function bindings(bufnr)
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr)
     if not ok then
-        vim.notify("REPL: " .. tostring(parser), vim.log.levels.WARN)
+        message.warn(tostring(parser))
         return
     end
     if not parser then return end
     local ok_query, query = pcall(vim.treesitter.query.get, parser:lang(), "repl-iterate")
     if not ok_query then
-        vim.notify("REPL: " .. tostring(query), vim.log.levels.WARN)
+        message.warn(tostring(query))
         return
     end
     if not query then return end

@@ -5,6 +5,7 @@
 local M = {}
 
 local config = require("kittyREPL.config")
+local message = require("kittyREPL.message")
 
 ---Run a command to completion.
 ---Swapped out in tests to exercise the send path without kitty.
@@ -27,14 +28,14 @@ local function kitty_cmd(argv, stdin, no_match_ok)
     -- is every mapped key on a machine without the kitty CLI
     local ok, out = pcall(M._exec, vim.list_extend({ "kitty", "@" }, argv), stdin)
     if not ok then
-        vim.notify_once("kittyREPL: " .. tostring(out), vim.log.levels.WARN)
+        message.warn_once(tostring(out))
         return
     end
     if out.code == 0 then return out.stdout end
     local err = vim.trim(out.stderr or "")
     if no_match_ok and err:find("No matching windows", 1, true) then return end
     -- once: an unusable remote control fails identically on every key
-    vim.notify_once("kittyREPL: " .. err, vim.log.levels.WARN)
+    message.warn_once(err)
 end
 
 ---Read text out of a kitty window.

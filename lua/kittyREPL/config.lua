@@ -9,6 +9,13 @@
 -- programs bridges the two: it is keyed by filetype and its values are program
 -- names. A program name and a filetype coincide for some languages (julia, lua)
 -- and differ for others (an r buffer drives radian).
+
+-- kitty.lua requires this module, so the senders in `custom` resolve it at call
+-- time; a top-level require here would be a cycle.
+local function kitty()
+    return require("kittyREPL.kitty")
+end
+
 local M = {
     -- Set keymaps in setup call or map something to these <plug> maps.
     keymap = {
@@ -62,8 +69,27 @@ local M = {
     linewise = { python = true },
     -- Program-keyed functions for how to send code to the REPL.
     -- Args: win, text, post, where post is either '' or '\n'.
-    -- Populated in init.lua after kitty module is available.
-    custom = {},
+    custom = {
+        pymol = function(win, text, post)
+            -- wrap multiline in python .. python end
+            -- https://pymolwiki.org/index.php/PythonTerminal
+            if text:match('\n') then
+                kitty().send_raw(win, "python\n" .. text:gsub("\n*$", "") .. "\npython end" .. post)
+            else
+                kitty().send_raw(win, text .. post)
+            end
+        end,
+        lua = function(win, text, post)
+            -- top level locals are ignored in REPL so we strip that.
+            kitty().send_raw(win, text:gsub("^local ", ""):gsub("\nlocal ", "\n") .. post)
+        end,
+        julia = function(win, text, post)
+            -- Fixed a huge problem, super weird, julia was insanely slow typing one char at a time.
+            -- I realised it was because even though we set it to use bracketed it only sends it bracketed with multiline.
+            -- Solution here: always send bracketed.
+            kitty().send_bracketed(win, text, post)
+        end,
+    },
     -- Filetype-keyed sets of the program names a filetype accepts as its REPL,
     -- used to find a REPL window automatically. Union of the values is also the
     -- closed set of names identity resolution can return, so a window running
@@ -76,7 +102,12 @@ local M = {
         julia  = { julia = true },
         pymol  = { pymol = true },
         lua    = { lua = true },
+        -- spelled out per shell rather than aliased to one table, so that a user
+        -- overriding one of them does not leave the others pointing at the
+        -- pre-merge set
         sh     = { sh = true, zsh = true, bash = true },
+        zsh    = { sh = true, zsh = true, bash = true },
+        bash   = { sh = true, zsh = true, bash = true },
     },
     -- command to execute in new kitty window. Split on whitespace into argv, not
     -- run through a shell, so ~, $VAR, globs and quoting are all literal.
@@ -138,8 +169,5 @@ local M = {
         },
     },
 }
-
-M.programs.zsh = M.programs.sh
-M.programs.bash = M.programs.sh
 
 return M

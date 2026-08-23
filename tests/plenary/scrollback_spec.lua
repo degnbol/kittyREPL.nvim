@@ -1,6 +1,10 @@
 ---@diagnostic disable: undefined-global
 local scrollback = require("kittyREPL.scrollback")
+local kitty = require("kittyREPL.kitty")
+local config = require("kittyREPL.config")
 local parse = scrollback.parseHistoryText
+
+local WIN = 7
 
 describe("parseHistoryText", function()
     it("parses plain history (most recent first)", function()
@@ -112,6 +116,76 @@ describe("parseHistoryText", function()
         assert.are.same({ "multi", "line" }, entries[1])
         assert.are.same({ "plain second" }, entries[2])
         assert.are.same({ "first" }, entries[3])
+    end)
+end)
+
+describe("scroll", function()
+    local exec, notify
+    before_each(function()
+        exec, notify = kitty._exec, vim.notify
+        vim.notify = function() end
+    end)
+    after_each(function()
+        kitty._exec, vim.notify = exec, notify
+    end)
+
+    ---Load a REPL screen as the scrollback to be walked backwards.
+    ---@param program string
+    ---@param lines string[]
+    local function screen(program, lines)
+        local text = table.concat(lines, "\n")
+        kitty._exec = function() return { code = 0, stdout = text, stderr = "" } end
+        scrollback.read(WIN, program)
+    end
+
+    it("walks back over commands, skipping the empty prompt at the bottom", function()
+        screen("python", {
+            "Python 3.12.0",
+            ">>> x = 1",
+            "1",
+            ">>> def f():",
+            "...     return 1",
+            "... ",
+            ">>> ",
+        })
+        assert.are.same({ "def f():", "    return 1", "" }, scrollback.scroll(1, "python"))
+        assert.are.same({ "x = 1" }, scrollback.scroll(1, "python"))
+        assert.are.same({ "def f():", "    return 1", "" }, scrollback.scroll(-1, "python"))
+    end)
+
+    it("stops at the oldest command instead of parsing the banner", function()
+        screen("python", { "Python 3.12.0", ">>> x = 1", ">>> " })
+        assert.are.same({ "x = 1" }, scrollback.scroll(1, "python"))
+        assert.are.same({ "x = 1" }, scrollback.scroll(1, "python"))
+    end)
+
+    it("reads a prompt only at the line start, not inside output", function()
+        -- julia's prompt pattern ends in "> ", which unanchored also matches the
+        -- pair syntax in "1 => 2"
+        screen("julia", {
+            "Documentation: https://docs.julialang.org",
+            "julia> d = Dict(1 => 2)",
+            "Dict{Int64, Int64} with 1 entry:",
+            "  1 => 2",
+            "julia> ",
+        })
+        assert.are.same({ "d = Dict(1 => 2)" }, scrollback.scroll(1, "julia"))
+    end)
+
+    it("anchors a prompt pattern added after setup", function()
+        config.match.prompt.mine = { "mine> ", "  " }
+        screen("mine", { "banner", "mine> x = 1", "mine> " })
+        assert.are.same({ "x = 1" }, scrollback.scroll(1, "mine"))
+        config.match.prompt.mine = nil
+    end)
+
+    it("warns and gives nothing for a program without a prompt pattern", function()
+        local notified
+        vim.notify = function(msg) notified = msg end
+        screen("nosuchrepl", { "$ ls", "$ " })
+        assert.is_nil(scrollback.scroll(1, "nosuchrepl"))
+        -- the exact message, since an exhausted scrollback also gives nothing
+        assert.are.equal("REPL: no prompt pattern for nosuchrepl", notified)
     end)
 end)
 

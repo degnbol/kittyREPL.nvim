@@ -7,6 +7,7 @@ local M = {}
 
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
+local message = require("kittyREPL.message")
 
 -- [win] = { program = "radian"|nil, pending = "radian"|nil }
 -- `pending` is the launch word, standing in until resolution succeeds:
@@ -119,11 +120,11 @@ function M.attach(win, hint)
     end
     local window = identify(win)
     if not window then
-        vim.notify("REPL: no kitty window with id " .. win, vim.log.levels.WARN)
+        message.warn("no kitty window with id " .. win)
         return nil
     end
     if is_editor(window) then
-        vim.notify("REPL: kitty window " .. win .. " is an editor", vim.log.levels.WARN)
+        message.warn("kitty window " .. win .. " is an editor")
         return nil
     end
     vim.b.repl_win = win

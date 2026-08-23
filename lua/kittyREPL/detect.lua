@@ -4,6 +4,7 @@ local M = {}
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local repl = require("kittyREPL.repl")
+local message = require("kittyREPL.message")
 
 ---Program names the filetype accepts as its REPL.
 ---@param ft string
@@ -22,8 +23,8 @@ end
 function M.detect_REPL()
     local programs = claimed_programs(vim.bo.filetype)
     if not programs then
-        vim.notify("REPL: no programs configured for filetype " .. vim.bo.filetype ..
-            ". Set the REPL window manually.", vim.log.levels.WARN)
+        message.warn("no programs configured for filetype " .. vim.bo.filetype ..
+            ". Set the REPL window manually.")
         return
     end
     local tab = kitty.get_focused_tab()
@@ -37,7 +38,7 @@ function M.detect_REPL()
     end
 end
 
----Run function f with args if REPL is valid, otherwise print "No REPL".
+---Run function f with args if the buffer has a REPL, otherwise report that it has none.
 ---@param f function
 ---@return function
 function M.replCheck(f)
@@ -45,7 +46,7 @@ function M.replCheck(f)
         if repl.revalidate() or M.detect_REPL() then
             return f(...)
         else
-            print("No REPL")
+            message.warn("none found")
         end
     end
 end
