@@ -13,23 +13,26 @@ local fn = vim.fn
 ---@param text string
 ---@param raw boolean?
 local function run(text, raw)
-    local _, program = repl.current()
-    kitty.run(program, text, raw)
+    local win, program = repl.current()
+    if not win then return end
+    kitty.run(win, program, text, raw)
 end
 
 ---Send text to the buffer's REPL without executing it.
 ---@param text string
 ---@param raw boolean?
 local function paste(text, raw)
-    local _, program = repl.current()
-    kitty.paste(program, text, raw)
+    local win, program = repl.current()
+    if not win then return end
+    kitty.paste(win, program, text, raw)
 end
 
 ---Get the help command needed to prefix a help search term for the running REPL program.
+---@param win integer
 ---@param program string|nil
 ---@param query string
 ---@return string?
-local function replHelpCmd(program, query)
+local function replHelpCmd(win, program, query)
     local helpCmd = config.match.help[program] or "?"
     -- if the config.match.help entry for a program is a table, then it means
     -- we need to look for the current REPL prompt context to understand which
@@ -39,7 +42,7 @@ local function replHelpCmd(program, query)
         return helpCmd[1] .. query .. helpCmd[2]
     end
     -- otherwise key-value dict
-    local text = kitty.get_scrollback() or ""
+    local text = kitty.get_scrollback(win) or ""
     while true do
         local lastline = text:match("\n([^\n]*)$")
         if lastline == nil then return end
@@ -212,8 +215,9 @@ end
 
 ---Look up help for the word under the cursor.
 function M.help()
-    local _, program = repl.current()
-    local helpcmd = replHelpCmd(program, fn.expand("<cword>"))
+    local win, program = repl.current()
+    if not win then return end
+    local helpcmd = replHelpCmd(win, program, fn.expand("<cword>"))
     if helpcmd then
         run(helpcmd, true)
     end
@@ -222,8 +226,9 @@ end
 ---Look up help for the visual selection.
 function M.helpVisual()
     cmd 'silent normal! "ky'
-    local _, program = repl.current()
-    local helpcmd = replHelpCmd(program, fn.getreg('k'))
+    local win, program = repl.current()
+    if not win then return end
+    local helpcmd = replHelpCmd(win, program, fn.getreg('k'))
     if helpcmd then
         run(helpcmd, true)
     end
@@ -236,7 +241,22 @@ end
 ---@param text string
 ---@return function
 function M.sendCustom(text)
-    return function() kitty.send_raw(text) end
+    return function()
+        local win = repl.win()
+        if win then kitty.send_raw(win, text) end
+    end
+end
+
+---Focus the buffer's REPL window.
+function M.focus()
+    local win = repl.win()
+    if win then kitty.focus(win) end
+end
+
+---Send a SIGINT to the buffer's REPL.
+function M.interrupt()
+    local win = repl.win()
+    if win then kitty.interrupt(win) end
 end
 
 ---Toggle cursor progress after commands.

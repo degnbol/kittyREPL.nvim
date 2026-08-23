@@ -9,7 +9,8 @@ local sent, notified
 ---Capture what the commands send and notify instead of doing it.
 local function record()
     sent, notified = nil, nil
-    kitty.run = function(_, text) sent = text end
+    kitty.run = function(_, _, text) sent = text end
+    kitty.window = function() return { id = 7, foreground_processes = {} } end
     vim.notify = function(msg) notified = msg end
 end
 
@@ -23,6 +24,7 @@ local function open(ft, lines, cursor)
     vim.bo[buf].filetype = ft
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     vim.api.nvim_win_set_cursor(0, cursor)
+    vim.b.repl_win = 7
 end
 
 describe("commands.runLineFor", function()

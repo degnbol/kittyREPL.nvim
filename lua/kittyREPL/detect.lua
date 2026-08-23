@@ -42,7 +42,7 @@ end
 ---@return function
 function M.replCheck(f)
     return function(...)
-        if vim.b.repl_win ~= nil and kitty.exists(vim.b.repl_win) or M.detect_REPL() ~= nil then
+        if repl.revalidate() or M.detect_REPL() then
             return f(...)
         else
             print("No REPL")

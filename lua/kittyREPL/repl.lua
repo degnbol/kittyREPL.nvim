@@ -94,6 +94,18 @@ local function remember(win, program)
     wins[win] = state
 end
 
+---Fetch a window's record, caching what it resolves to.
+---@param win integer
+---@return table|nil window `kitty @ ls` record, nil once the window is gone
+---@return string|nil program
+local function identify(win)
+    local window = kitty.window(win)
+    if not window then return nil end
+    local program = M.resolve(window)
+    remember(win, program)
+    return window, program
+end
+
 ---Bind the current buffer to a REPL window and record what runs there.
 ---@param win integer|nil
 ---@param hint string|nil program name from the command a launch was asked for
@@ -105,7 +117,7 @@ function M.attach(win, hint)
         vim.b.repl_win = win
         return win
     end
-    local window = kitty.window(win)
+    local window = identify(win)
     if not window then
         vim.notify("REPL: no kitty window with id " .. win, vim.log.levels.WARN)
         return nil
@@ -114,8 +126,19 @@ function M.attach(win, hint)
         vim.notify("REPL: kitty window " .. win .. " is an editor", vim.log.levels.WARN)
         return nil
     end
-    remember(win, M.resolve(window))
     vim.b.repl_win = win
+    return win
+end
+
+---Re-check that the buffer's binding still points at a usable REPL.
+---Refreshes identity from the record it already had to fetch, so a resolvable
+---program costs one round trip here instead of one here and one in M.program.
+---@return integer|nil win nil when unbound, gone, or now running an editor
+function M.revalidate()
+    local win = M.win()
+    if not win then return nil end
+    local window = identify(win)
+    if not window or is_editor(window) then return nil end
     return win
 end
 
@@ -125,17 +148,23 @@ end
 function M.program(win)
     local state = wins[win]
     if state and state.program then return state.program end
-    local window = kitty.window(win)
-    local program = window and M.resolve(window)
-    remember(win, program)
+    local _, program = identify(win)
     return program or (state and state.pending)
 end
 
+---The window this buffer sends to.
+---@return integer|nil
+function M.win()
+    return vim.b.repl_win
+end
+
 ---The window this buffer sends to and the program running in it.
+---Costs a kitty round trip when the identity is not yet cached, so prefer
+---M.win() where the program is not needed.
 ---@return integer|nil win
 ---@return string|nil program
 function M.current()
-    local win = vim.b.repl_win
+    local win = M.win()
     if not win then return nil end
     return win, M.program(win)
 end

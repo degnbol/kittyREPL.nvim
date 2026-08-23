@@ -49,24 +49,24 @@ function M.setup(userconfig)
     end
 
     -- Set up custom send functions that need access to kitty module
-    config.custom.pymol = function(text, post)
+    config.custom.pymol = function(win, text, post)
         -- wrap multiline in python .. python end
         -- https://pymolwiki.org/index.php/PythonTerminal
         if text:match('\n') then
-            kitty.send_raw("python\n" .. text:gsub("\n*$", "") .. "\npython end" .. post)
+            kitty.send_raw(win, "python\n" .. text:gsub("\n*$", "") .. "\npython end" .. post)
         else
-            kitty.send_raw(text .. post)
+            kitty.send_raw(win, text .. post)
         end
     end
-    config.custom.lua = function(text, post)
+    config.custom.lua = function(win, text, post)
         -- top level locals are ignored in REPL so we strip that.
-        kitty.send_raw(text:gsub("^local ", ""):gsub("\nlocal ", "\n") .. post)
+        kitty.send_raw(win, text:gsub("^local ", ""):gsub("\nlocal ", "\n") .. post)
     end
-    config.custom.julia = function(text, post)
+    config.custom.julia = function(win, text, post)
         -- Fixed a huge problem, super weird, julia was insanely slow typing one char at a time.
         -- I realised it was because even though we set it to use bracketed it only sends it bracketed with multiline.
         -- Solution here: always send bracketed.
-        kitty.send_bracketed(text, post)
+        kitty.send_bracketed(win, text, post)
     end
 
     -- Transform prompt patterns to match from start of line (only once)
@@ -96,7 +96,7 @@ function M.setup(userconfig)
             end
 
             nmap(c.keymap.new, commands.new, "REPL new")
-            nmap(c.keymap.focus, detect.replCheck(kitty.focus), "REPL focus")
+            nmap(c.keymap.focus, detect.replCheck(commands.focus), "REPL focus")
             nmap(c.keymap.set, commands.set, "REPL set")
             nmap(c.keymap.setlast, commands.setLast, "REPL set last")
             nmap(c.keymap.run, detect.replCheck(operator("ReplRunOperator")), "REPL run motion", true)
@@ -113,7 +113,7 @@ function M.setup(userconfig)
             nmap(c.keymap.cr, detect.replCheck(commands.sendCustom("\x0d")), "REPL send CR")
             nmap(c.keymap.ctrld, detect.replCheck(commands.sendCustom("\x04")), "REPL send Ctrl+d")
             nmap(c.keymap.ctrlc, detect.replCheck(commands.sendCustom("\x03")), "REPL send Ctrl+c")
-            nmap(c.keymap.interrupt, detect.replCheck(kitty.interrupt), "REPL interrupt")
+            nmap(c.keymap.interrupt, detect.replCheck(commands.interrupt), "REPL interrupt")
             nmap(c.keymap.scrollStart, detect.replCheck(scrollback.startScroll), "REPL paste from scrollback")
             xmap(c.keymap.scrollUp, detect.replCheck(scrollback.replaceScroll(1)), "REPL paste older scrollback")
             xmap(c.keymap.scrollDown, detect.replCheck(scrollback.replaceScroll(-1)), "REPL paste newer scrollback")

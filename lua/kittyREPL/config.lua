@@ -60,7 +60,8 @@ local M = {
     -- and sends them one at a time. Still skipping empty newlines or adding
     -- whitespace to them.
     linewise = { python = true },
-    -- custom functions for how to send code to the REPL. Args: text, post. post is either '' or '\n'.
+    -- Program-keyed functions for how to send code to the REPL.
+    -- Args: win, text, post, where post is either '' or '\n'.
     -- Populated in init.lua after kitty module is available.
     custom = {},
     -- Filetype-keyed sets of the program names a filetype accepts as its REPL,
@@ -77,7 +78,8 @@ local M = {
         lua    = { lua = true },
         sh     = { sh = true, zsh = true, bash = true },
     },
-    -- command to execute in new kitty window.
+    -- command to execute in new kitty window. Split on whitespace into argv, not
+    -- run through a shell, so ~, $VAR, globs and quoting are all literal.
     command = {
         python = "ipython",
         julia = "julia",

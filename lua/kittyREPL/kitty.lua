@@ -1,23 +1,59 @@
 -- Low-level kitty terminal communication
+--
+-- Every function that talks to a REPL takes the target window id explicitly. The
+-- buffer -> window binding lives in repl.lua.
 local M = {}
 
 local config = require("kittyREPL.config")
+
+---Run a command to completion.
+---Swapped out in tests to exercise the send path without kitty.
+---@param argv string[]
+---@param stdin string|nil written to the child's stdin, which is then closed
+---@return vim.SystemCompleted
+function M._exec(argv, stdin)
+    -- no text=true: get-text output is passed through byte for byte
+    return vim.system(argv, { stdin = stdin }):wait()
+end
+
+---Run a `kitty @` command.
+---@param argv string[] arguments following `kitty @`
+---@param stdin string|nil
+---@param no_match_ok boolean? treat a window that does not exist as an expected
+---nil instead of an error, which is how the existence check is expressed
+---@return string|nil stdout
+local function kitty_cmd(argv, stdin, no_match_ok)
+    -- vim.system raises rather than returns when it cannot spawn at all, which
+    -- is every mapped key on a machine without the kitty CLI
+    local ok, out = pcall(M._exec, vim.list_extend({ "kitty", "@" }, argv), stdin)
+    if not ok then
+        vim.notify_once("kittyREPL: " .. tostring(out), vim.log.levels.WARN)
+        return
+    end
+    if out.code == 0 then return out.stdout end
+    local err = vim.trim(out.stderr or "")
+    if no_match_ok and err:find("No matching windows", 1, true) then return end
+    -- once: an unusable remote control fails identically on every key
+    vim.notify_once("kittyREPL: " .. err, vim.log.levels.WARN)
+end
+
+---Read text out of a kitty window.
+---@param win integer
+---@param ... string `kitty @ get-text` flags
+---@return string|nil
+local function get_text(win, ...)
+    return kitty_cmd({ "get-text", "--match=id:" .. win, ... })
+end
 
 ---Parse kitty @ ls output into table.
 ---@param match string? optionally filter with --match argument
 ---@return table?
 function M.ls(match)
-    local cmd = "kitty @ ls"
-    if match then
-        cmd = cmd .. " --match=" .. match
-    end
-    cmd = cmd .. " 2> /dev/null"
-    local fh = io.popen(cmd)
-    if not fh then return end
-    local json_string = fh:read("*a")
-    fh:close()
-    -- if we are not in fact in a kitty terminal then the command will fail
-    if json_string == "" then return end
+    local argv = { "ls" }
+    if match then table.insert(argv, "--match=" .. match) end
+    -- a filtered ls is the existence check, so its no-match is a value, not a fault
+    local json_string = kitty_cmd(argv, nil, match ~= nil)
+    if not json_string then return end
     return vim.json.decode(json_string)
 end
 
@@ -38,6 +74,8 @@ function M.get_focused_tab()
 end
 
 ---Get the `kitty @ ls` record for one window.
+---Nil once the window is gone: `--match` with nothing to match is an error, which
+---M.ls reports as nil, and that is what makes this the existence check.
 ---@param win integer
 ---@return table|nil
 function M.window(win)
@@ -59,35 +97,25 @@ function M.get_winid(i)
     return win.id
 end
 
----Check if a kitty window exists.
----@param window_id integer
----@return boolean
-function M.exists(window_id)
-    return os.execute("kitty @ get-text --match id:" .. window_id .. " > /dev/null 2> /dev/null") == 0
-end
-
----Focus the REPL window.
-function M.focus()
-    os.execute("kitty @ focus-window --match id:" .. vim.b.repl_win)
+---Focus a kitty window.
+---@param win integer
+function M.focus(win)
+    kitty_cmd({ "focus-window", "--match=id:" .. win })
 end
 
 ---Send raw text to the REPL (no processing).
+---@param win integer
 ---@param text string
-function M.send_raw(text)
-    local fh = io.popen("kitty @ send-text --stdin --match id:" .. vim.b.repl_win, "w")
-    if not fh then return end
-    fh:write(text)
-    fh:close()
+function M.send_raw(win, text)
+    kitty_cmd({ "send-text", "--stdin", "--match=id:" .. win }, text)
 end
 
 ---Send text using bracketed paste mode.
+---@param win integer
 ---@param text string
 ---@param post string
-function M.send_bracketed(text, post)
-    local fh = io.popen("kitty @ send-text --stdin --match id:" .. vim.b.repl_win, "w")
-    if not fh then return end
-    fh:write("\x1b[200~" .. text .. "\x1b[201~" .. post)
-    fh:close()
+function M.send_bracketed(win, text, post)
+    M.send_raw(win, "\x1b[200~" .. text .. "\x1b[201~" .. post)
 end
 
 ---Fixes indentation by prepending Start Of Header signal.
@@ -97,75 +125,68 @@ end
 ---@param text string
 ---@return string
 function M.SOH(text)
-    return text:gsub('\n', '\n\x01')
-end
-
----Count number of occurrences of pattern in text.
----@param text string
----@param pattern string
----@return integer
-local function strcount(text, pattern)
-    return select(2, string.gsub(text, pattern, ""))
+    return (text:gsub('\n', '\n\x01'))
 end
 
 ---Send text to the REPL with appropriate method based on config.
 ---An unresolved program falls through to a raw send, the conservative default.
+---@param win integer
 ---@param program string|nil program running in the REPL
 ---@param text string
 ---@param post string
----@param raw boolean?
-function M.send(program, text, post, raw)
-    if config.closepager and M.detect_pager() then
-        M.send_raw("q")
+---@param raw boolean? send as if the program were unknown
+function M.send(win, program, text, post, raw)
+    if config.closepager and M.detect_pager(win) then
+        M.send_raw(win, "q")
     end
-    if raw then
-        M.send_raw(text .. post)
-    else
-        if config.custom[program] then
-            config.custom[program](text, post)
-        elseif config.bracketed[program] then
-            if strcount(text, "\n") > 0 then
-                M.send_bracketed(text, post)
-            else
-                M.send_raw(text .. post)
-            end
-        elseif config.linewise[program] then
-            for _, line in ipairs(vim.split(text, '\n')) do
-                if line ~= "" then
-                    M.send_raw(line .. '\n')
-                end
-            end
-            M.send_raw(post)
+    -- an unknown program is already the raw fallthrough, so asking for a raw
+    -- send is the same as forgetting which program this is
+    if raw then program = nil end
+    if config.custom[program] then
+        config.custom[program](win, text, post)
+    elseif config.bracketed[program] then
+        if text:find("\n") then
+            M.send_bracketed(win, text, post)
         else
-            M.send_raw(text .. post)
+            M.send_raw(win, text .. post)
         end
+    elseif config.linewise[program] then
+        for _, line in ipairs(vim.split(text, '\n')) do
+            if line ~= "" then
+                M.send_raw(win, line .. '\n')
+            end
+        end
+        M.send_raw(win, post)
+    else
+        M.send_raw(win, text .. post)
     end
 end
 
 ---Run text in the REPL (send with newline).
+---@param win integer
 ---@param program string|nil
 ---@param text string
 ---@param raw boolean?
-function M.run(program, text, raw)
-    M.send(program, text, '\n', raw)
+function M.run(win, program, text, raw)
+    M.send(win, program, text, '\n', raw)
 end
 
 ---Paste text to the REPL (send without trailing newline).
+---@param win integer
 ---@param program string|nil
 ---@param text string
 ---@param raw boolean?
-function M.paste(program, text, raw)
-    M.send(program, text:gsub('\n$', ''), '', raw)
-    if config.editpaste then M.focus() end
+function M.paste(win, program, text, raw)
+    M.send(win, program, text:gsub('\n$', ''), '', raw)
+    if config.editpaste then M.focus(win) end
 end
 
 ---Detect whether the REPL is currently displaying a pager (e.g. help texts).
+---@param win integer
 ---@return boolean
-function M.detect_pager()
-    local fh = io.popen("kitty @ get-text --extent=screen --add-cursor --match id:" .. vim.b.repl_win)
-    if not fh then return false end
-    local scrollback = fh:read("*a")
-    fh:close()
+function M.detect_pager(win)
+    local scrollback = get_text(win, "--extent=screen", "--add-cursor")
+    if not scrollback then return false end
     -- Get cursor position to check if it is placed right after a pager pattern to match.
     -- Lua pattern explanation:
     -- Matched pattern is ^[[?25h^[[n;mH^[[?12h where
@@ -187,49 +208,44 @@ function M.detect_pager()
 end
 
 ---Get scrollback text from the REPL.
+---@param win integer
 ---@return string?
-function M.get_scrollback()
-    local fh = io.popen("kitty @ get-text --extent=all --match id:" .. vim.b.repl_win)
-    if not fh then return end
-    local text = fh:read("*a")
-    fh:close()
-    return text
+function M.get_scrollback(win)
+    return get_text(win, "--extent=all")
 end
 
 ---Get last command output from the REPL (requires kitty shell integration).
+---@param win integer
 ---@return string?
-function M.get_last_output()
-    local fh = io.popen("kitty @ get-text --extent=last_cmd_output --match id:" .. vim.b.repl_win)
-    if not fh then return end
-    local text = fh:read("*a")
-    fh:close()
+function M.get_last_output(win)
+    local text = get_text(win, "--extent=last_cmd_output")
     if text == "" then return end
     return text
 end
 
 ---Send a SIGINT to the REPL.
----@return boolean
-function M.interrupt()
-    return os.execute("kitty @ signal-child --match id:" .. vim.b.repl_win) == 0
+---@param win integer
+function M.interrupt(win)
+    kitty_cmd({ "signal-child", "--match=id:" .. win })
 end
 
 ---Launch a new kitty window.
 ---@param command string?
 ---@return integer? window_id
 function M.launch(command)
-    command = command or ""
-    local fh = io.popen("kitty @ launch --cwd=current --keep-focus " .. command)
-    if not fh then return end
-    local win = fh:read("*n") -- *n means read number, which also strips newline
-    fh:close()
-    return win
+    local argv = { "launch", "--cwd=current", "--keep-focus" }
+    -- config.command values are user-authored strings, so they arrive as one
+    -- word-splittable string; vim.split keeps them off a shell command line.
+    vim.list_extend(argv, vim.split(command or "", "%s+", { trimempty = true }))
+    local out = kitty_cmd(argv)
+    return out and tonumber(out)
 end
 
 ---Set the title of a kitty window.
----@param window_id integer
+---@param win integer
 ---@param title string
-function M.set_title(window_id, title)
-    os.execute("kitty @ set-window-title --match id:" .. window_id .. " " .. title)
+function M.set_title(win, title)
+    kitty_cmd({ "set-window-title", "--match=id:" .. win, title })
 end
 
 return M

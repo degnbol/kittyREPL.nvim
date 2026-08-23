@@ -21,7 +21,9 @@ local wins = {}   -- [win] = { program = "radian", pending = "radian"|nil, sent 
 
 M.attach(win, hint)  -- bind buffer -> win, cache identity, returns win|nil
 M.resolve(window)    -- `kitty @ ls` record -> program name|nil. Pure; the tested unit
+M.revalidate()       -- binding still usable? refreshes identity from the same record
 M.program(win)       -- cached program name, resolving lazily on first use
+M.win()              -- -> win|nil
 M.current()          -- -> win|nil, program|nil
 ```
 

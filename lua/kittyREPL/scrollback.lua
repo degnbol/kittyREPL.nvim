@@ -85,15 +85,16 @@ function M.readHistory(path)
 end
 
 ---Read the raw scrollback text and reset parsing state.
+---@param win integer
 ---@param program string|nil program running in the REPL
-function M.read(program)
+function M.read(win, program)
     tScrollback = {}
     iScrollback = 0
     if shells[program] then
         tScrollback = M.readHistory(histfile(program))
         scrollback = ""
     else
-        scrollback = kitty.get_scrollback() or ""
+        scrollback = kitty.get_scrollback(win) or ""
     end
 end
 
@@ -170,8 +171,9 @@ end
 
 ---Start scrolling through scrollback, inserting first command at cursor.
 function M.startScroll()
-    local _, program = repl.current()
-    M.read(program)
+    local win, program = repl.current()
+    if not win then return end
+    M.read(win, program)
     local rcmd = M.scroll(1, program)
     if rcmd == nil then return end
     vim.api.nvim_put(rcmd, "c", true, false)
@@ -183,9 +185,10 @@ end
 ---@return function
 function M.replaceScroll(delta)
     return function()
-        local _, program = repl.current()
+        local win, program = repl.current()
+        if not win then return end
         -- edge case where replaceScroll is called before startScroll
-        if iScrollback == 0 then M.read(program) end
+        if iScrollback == 0 then M.read(win, program) end
         local rcmd = M.scroll(delta, program)
         if rcmd == nil then return end
         vim.fn.setreg("k", rcmd)
@@ -196,7 +199,9 @@ end
 ---Paste last REPL command output as comments.
 ---@param after boolean insert after cursor line (true) or before (false)
 function M.pasteOutput(after)
-    local text = kitty.get_last_output()
+    local win = repl.win()
+    if not win then return end
+    local text = kitty.get_last_output(win)
     if not text then
         print("No output")
         return
