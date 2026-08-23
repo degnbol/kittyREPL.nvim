@@ -1,5 +1,6 @@
 ---@diagnostic disable: undefined-global
 -- Screens as a live kitty returned them, captured by tests/fixtures/pager.sh.
+-- The two shapes at the bottom are written by hand: no pager reproduced them.
 local kitty = require("kittyREPL.kitty")
 
 ---One captured `kitty @ get-text --extent=screen --add-cursor` screen.
@@ -39,7 +40,11 @@ describe("kitty.is_pager", function()
         assert.is_false(kitty.is_pager(screen("less-noalt-quit")))
     end)
 
-    it("ignores a screen with no cursor position, which is a scrolled-up window", function()
+    it("ignores a colon line with the screen blank below it", function()
+        assert.is_false(kitty.is_pager("a\n:\n\27[?25h\27[2;2H\27[?12h\n"))
+    end)
+
+    it("ignores a screen with no cursor position", function()
         assert.is_false(kitty.is_pager("1\n2\n(END)\n"))
     end)
 end)

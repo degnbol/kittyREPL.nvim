@@ -110,24 +110,29 @@ function M.setLast()
     repl.attach(history[#history])
 end
 
----Run the current line in the REPL.
-function M.runLine()
+---Send the current line to the buffer's REPL v:count times, progressing a line
+---between sends. The REPL is resolved and its pager cleared once for the lot.
+---@param send fun(win: integer, program: string|nil, text: string)
+local function sendLines(send)
+    local win, program = repl.current()
+    if not win then return end
+    closePager(win)
     for _ = 1, vim.v.count1 do
-        run(vim.api.nvim_get_current_line(), false)
+        send(win, program, vim.api.nvim_get_current_line())
         if config.progress then
             cmd 'silent normal! j'
         end
     end
 end
 
+---Run the current line in the REPL.
+function M.runLine()
+    sendLines(kitty.run)
+end
+
 ---Paste the current line to the REPL.
 function M.pasteLine()
-    for _ = 1, vim.v.count1 do
-        paste(vim.api.nvim_get_current_line(), false)
-        if config.progress then
-            cmd 'silent normal! j'
-        end
-    end
+    sendLines(kitty.paste)
 end
 
 ---Expression taking an element out of an iterable in the given language.

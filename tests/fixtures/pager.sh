@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # Screens as `kitty @ get-text --extent=screen --add-cursor` returns them, for
 # the is_pager spec. Needs a running kitty with remote control enabled, julia
-# with TerminalPager, and less.
+# with TerminalPager, less, and a shell prompt ending in ❯.
 set -euo pipefail
 cd ${0:A:h}
 mkdir -p pager
@@ -16,6 +16,7 @@ waitfor() {
         sleep 1
     done
     print -u2 "kittyREPL: window $win never matched /$1/"
+    kitty @ close-window --match=id:$win
     exit 1
 }
 
@@ -43,6 +44,7 @@ send G
 waitfor '^\(END\)'
 capture less-end
 send q
+waitfor '❯ *$'
 
 # -X keeps less out of the alternate screen, so quitting leaves the paged text
 # on screen with the shell prompt over the pager's own last line

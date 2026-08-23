@@ -11,6 +11,8 @@ local function record()
     sent, notified = nil, nil
     kitty.run = function(_, _, text) sent = text end
     kitty.window = function() return { id = 7, foreground_processes = {} } end
+    -- nothing here may reach the developer's terminal, whichever config defaults change
+    kitty._exec = function() return { code = 0, stdout = "", stderr = "" } end
     vim.notify = function(msg) notified = msg end
 end
 
@@ -28,20 +30,32 @@ local function open(ft, lines, cursor)
 end
 
 describe("commands pager probe", function()
-    local probes, raw
+    local probes, raw, detect_pager, send_raw, closepager
     before_each(function()
         probes, raw = 0, {}
+        detect_pager, send_raw, closepager = kitty.detect_pager, kitty.send_raw, config.closepager
         config.closepager = true
         kitty.detect_pager = function() probes = probes + 1; return true end
         kitty.send_raw = function(_, text) table.insert(raw, text) end
     end)
     after_each(function()
-        config.closepager = false
+        kitty.detect_pager, kitty.send_raw, config.closepager = detect_pager, send_raw, closepager
     end)
 
     it("probes once per action, where sending probed once per send", function()
         open("python", { "1 + 1" }, { 1, 0 })
         commands.runLine()
+        assert.are.equal(1, probes)
+    end)
+
+    it("probes once for a counted action, not once per line it sends", function()
+        open("python", { "1 + 1", "2 + 2", "3 + 3" }, { 1, 0 })
+        local sends = 0
+        kitty.run = function() sends = sends + 1 end
+        -- v:count1 is only set inside a mapping, so this one is pressed, not called
+        vim.keymap.set("n", "R", commands.runLine, { buffer = 0 })
+        vim.api.nvim_feedkeys("3R", "mx", false)
+        assert.are.equal(3, sends)
         assert.are.equal(1, probes)
     end)
 
