@@ -3,12 +3,14 @@ local M = {}
 
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
+local repl = require("kittyREPL.repl")
 local detect = require("kittyREPL.detect")
 local scrollback = require("kittyREPL.scrollback")
 local commands = require("kittyREPL.commands")
 
 -- Re-export submodules for advanced usage
 M.kitty = kitty
+M.repl = repl
 M.detect = detect
 M.scrollback = scrollback
 M.commands = commands

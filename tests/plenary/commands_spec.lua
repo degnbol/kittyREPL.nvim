@@ -9,7 +9,7 @@ local sent, notified
 ---Capture what the commands send and notify instead of doing it.
 local function record()
     sent, notified = nil, nil
-    kitty.run = function(text) sent = text end
+    kitty.run = function(_, text) sent = text end
     vim.notify = function(msg) notified = msg end
 end
 

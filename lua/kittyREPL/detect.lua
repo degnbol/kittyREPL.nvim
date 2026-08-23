@@ -3,68 +3,37 @@ local M = {}
 
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
+local repl = require("kittyREPL.repl")
 
----Detect REPL window relevant for the current filetype and detect which cmd is
----being run in the repl by scanning through windows and matching on cmdline
----and title.
----@param wins? table list of window ids to search. Default=all in the focused tab.
----@return integer?
-function M.detect_REPL(wins)
-    local detect = config.match.detect[vim.bo.filetype]
-    if not detect then
-        for ft in vim.bo.filetype:gmatch("[^.]+") do
-            detect = config.match.detect[ft]
-            if detect then break end
-        end
+---Program names the filetype accepts as its REPL.
+---@param ft string
+---@return table<string, boolean>|nil
+local function claimed_programs(ft)
+    if config.programs[ft] then return config.programs[ft] end
+    -- a compound filetype is claimed by any of its parts, e.g. "python.blender"
+    for part in ft:gmatch("[^.]+") do
+        if config.programs[part] then return config.programs[part] end
     end
-    if wins == nil then
-        if detect == nil then
-            print("No detect config for " .. vim.bo.filetype .. ". Set the REPL window manually.")
-            return
-        end
-        local focused_tab = kitty.get_focused_tab()
-        if focused_tab == nil then return end
-        wins = focused_tab.windows
+end
+
+---Attach the buffer to a window on the focused tab running a program the
+---current filetype claims.
+---@return integer|nil win
+function M.detect_REPL()
+    local programs = claimed_programs(vim.bo.filetype)
+    if not programs then
+        vim.notify("REPL: no programs configured for filetype " .. vim.bo.filetype ..
+            ". Set the REPL window manually.", vim.log.levels.WARN)
+        return
     end
-    for _, win in ipairs(wins) do
-        if type(win) == "number" then
-            -- with the --match=id:win filter we still get the same hierarchy,
-            -- but "tabs" and "windows" only have 1 entry each due to the filter.
-            local ls = kitty.ls("id:" .. win)
-            if not ls or not ls[1] or not ls[1].tabs or not ls[1].tabs[1] then
-                goto continue
-            end
-            win = ls[1].tabs[1].windows[1]
+    local tab = kitty.get_focused_tab()
+    if not tab then return end
+    for _, window in ipairs(tab.windows) do
+        local program = repl.resolve(window)
+        -- a candidate can still be refused, e.g. it closed since the tab listing
+        if program and programs[program] and repl.attach(window.id) then
+            return window.id
         end
-        -- use last foreground process, e.g. I observe if I start julia, then `using PlotlyJS`,
-        -- then PlotlyJS will open other processes that are listed earlier in the list.
-        -- If there are any problems then just loop and look in all foreground processes.
-        local procs = win.foreground_processes
-        if not procs or #procs == 0 then
-            goto continue
-        end
-        local cmdline = procs[#procs].cmdline
-        if not cmdline then
-            goto continue
-        end
-        -- we would never send to the editor.
-        if not win.is_self and cmdline[1] ~= "nvim" then
-            -- no detection config, but we are specifying exactly which window the REPL is in
-            if detect == nil and #wins == 1 then
-                -- the basename is a guess at the program name; the full cmdline never is
-                vim.b.repl_cmd = vim.fn.fnamemodify(cmdline[1], ":t"):lower()
-                vim.b.repl_win = win.id
-                print("No detect config for " .. vim.bo.filetype .. ". Assumes REPL program is \"" .. vim.b.repl_cmd .. "\".")
-                return win.id
-            end
-            local repl_cmd = detect(cmdline, win.title)
-            if repl_cmd then
-                vim.b.repl_cmd = repl_cmd
-                vim.b.repl_win = win.id
-                return win.id
-            end
-        end
-        ::continue::
     end
 end
 

@@ -3,6 +3,7 @@ local M = {}
 
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
+local repl = require("kittyREPL.repl")
 
 -- Module state
 local scrollback = ""
@@ -84,11 +85,12 @@ function M.readHistory(path)
 end
 
 ---Read the raw scrollback text and reset parsing state.
-function M.read()
+---@param program string|nil program running in the REPL
+function M.read(program)
     tScrollback = {}
     iScrollback = 0
-    if shells[vim.b.repl_cmd] then
-        tScrollback = M.readHistory(histfile(vim.b.repl_cmd))
+    if shells[program] then
+        tScrollback = M.readHistory(histfile(program))
         scrollback = ""
     else
         scrollback = kitty.get_scrollback() or ""
@@ -96,11 +98,12 @@ function M.read()
 end
 
 ---Parse one command entry from the scrollback text and truncate the text afterwards.
+---@param program string|nil
 ---@return table? lines array of command lines
-local function parseScrollback()
-    local prompt = config.match.prompt[vim.b.repl_cmd]
+local function parseScrollback(program)
+    local prompt = config.match.prompt[program]
     if not prompt then
-        vim.notify("kittyREPL: no prompt pattern for REPL " .. tostring(vim.b.repl_cmd), vim.log.levels.WARN)
+        vim.notify("kittyREPL: no prompt pattern for REPL " .. tostring(program), vim.log.levels.WARN)
         return
     end
     local pat, patCont = unpack(prompt)
@@ -129,8 +132,9 @@ end
 
 ---Scroll through REPL commands, while parsing scrollback when necessary.
 ---@param delta integer 1 or -1
+---@param program string|nil
 ---@return table? lines array of command lines
-function M.scroll(delta)
+function M.scroll(delta, program)
     if vim.v.count ~= 0 then
         delta = delta * vim.v.count
     end
@@ -140,7 +144,7 @@ function M.scroll(delta)
                 -- skip empty prompts
                 local rcmd = { "" }
                 while table.concat(rcmd) == "" do
-                    rcmd = parseScrollback()
+                    rcmd = parseScrollback(program)
                     if rcmd == nil then
                         print("REPL top")
                         return tScrollback[iScrollback]
@@ -166,8 +170,9 @@ end
 
 ---Start scrolling through scrollback, inserting first command at cursor.
 function M.startScroll()
-    M.read()
-    local rcmd = M.scroll(1)
+    local _, program = repl.current()
+    M.read(program)
+    local rcmd = M.scroll(1, program)
     if rcmd == nil then return end
     vim.api.nvim_put(rcmd, "c", true, false)
     vim.cmd.normal("v`[o")
@@ -178,9 +183,10 @@ end
 ---@return function
 function M.replaceScroll(delta)
     return function()
+        local _, program = repl.current()
         -- edge case where replaceScroll is called before startScroll
-        if iScrollback == 0 then M.read() end
-        local rcmd = M.scroll(delta)
+        if iScrollback == 0 then M.read(program) end
+        local rcmd = M.scroll(delta, program)
         if rcmd == nil then return end
         vim.fn.setreg("k", rcmd)
         vim.cmd.normal('"kpv`[o')

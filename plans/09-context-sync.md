@@ -82,22 +82,19 @@ gate, and attaching is explicit.
 ## Where it hooks in
 
 All code delivery funnels through `kitty.send` (`kitty.lua`) via `kitty.run`
-and `kitty.paste`. Dispatch from the `run`/`paste` wrappers in `commands.lua`
-that task 06 introduces for the pager probe:
+and `kitty.paste`. Dispatch from the `run`/`paste` wrappers in `commands.lua`,
+which task 04 created to resolve identity and 06 extends with the pager probe:
 
 ```lua
 local function run(text, raw)
-    local win, repl = require("kittyREPL.repl").current()
+    local win, program = repl.current()
     -- pager probe here (task 06), once per user action
-    context.sync(win, repl)
-    kitty.run(win, text, raw)
+    context.sync(win, program)
+    kitty.run(win, program, text, raw)
 end
 ```
 
-Then `kitty.run(` → `run(` throughout `commands.lua` — re-derive the call sites
-with `grep -n 'kitty\.\(run\|paste\)(' lua/kittyREPL/commands.lua` rather than
-working from a fixed list; tasks 03 and 05 both rewrite these lines. Dependency
-direction is `commands → context → kitty`.
+Dependency direction is `commands → context → kitty`.
 
 Do not dispatch from `detect.replCheck`: it wraps every REPL keymap
 (the `nmap`/`xmap` block in `init.lua`) including `focus`, `interrupt` and
@@ -143,8 +140,8 @@ wins[win].sent[key] = last_code_string   -- lua/kittyREPL/repl.lua
 
 Keyed by kitty window id, not buffer — one REPL serves many buffers, and that
 sharing is why `__file__` goes stale. Task 04 puts program identity in the same
-per-window table, so both facts sit together and `repl.forget(win)` is the single
-invalidation. Not keyed by pid; `design.md` § REPL identity has the reasoning.
+per-window table, so both facts sit together and re-attaching invalidates both.
+Not keyed by pid; `design.md` § REPL identity has the reasoning.
 
 Dead windows cannot be sent to, since `replCheck` gates on existence. Entries for
 dead ids leak until nvim exits — acceptable, bounded by REPLs per session.
@@ -224,7 +221,8 @@ Cases (`tests/plenary/context_spec.lua`):
 2. `config.lua` — `context`, `variables`, `assign` tables and the `__file__`
    default; quoting helper in the shared util.
 3. `lua/kittyREPL/context.lua` — `pending`, `mark`. No kitty dependency.
-4. `repl.lua` — `sent` sub-table per window; `forget` clears it.
+4. `repl.lua` — `sent` sub-table per window, dropped when the window is
+   re-attached along with the rest of the entry.
 5. `commands.lua` — `run`/`paste` wrappers call `pending` → send → `mark`.
 6. Tests, then `make test`.
 7. README — the three config tables, the `false` opt-out, and the multiprocessing

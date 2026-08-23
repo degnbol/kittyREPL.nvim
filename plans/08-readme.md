@@ -6,12 +6,13 @@
 ## The problem
 
 The README advertises `match.cmdline = { python3 = "python", radian = "r", … }`, a
-string→language map that was replaced by the `match.detect` functions. A user
-copying it gets a table that is silently ignored and no detection at all.
+string→language map that was replaced by the `match.detect` functions and then by
+`config.programs`. A user copying it gets a table that is silently ignored and no
+detection at all.
 
 It also states `bracketed = { python = true, r = true, julia = true }`,
-contradicting `config.lua:44`, and omits `linewise`, `custom`, `command_count` and
-four keymaps.
+contradicting the shipped defaults, and omits `linewise`, `custom`,
+`command_count` and four keymaps.
 
 ## Do
 

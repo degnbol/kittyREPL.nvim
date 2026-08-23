@@ -48,8 +48,8 @@ window then treats itself as nested.
 ## Why not a shell wrapper
 
 `kitty @ launch /bin/zsh -lc 'exec radian'` reports two foreground processes with
-the wrapper last, so `detect.lua:48`'s `procs[#procs]` sees
-`["/bin/zsh","-lc","exec radian"]` and `config.match.detect.r` returns nil. `exec`
+the wrapper last, so `repl.lua`'s `cmdline` sees
+`["/bin/zsh","-lc","exec radian"]` and `repl.resolve` returns nil. `exec`
 cannot help, because the surviving process is not zsh: the first word is the
 user's shell, so kitty applies shell integration and runs
 `/usr/bin/login -f -l -p <user> …/kitten run-shell --shell /bin/zsh -lc 'exec radian'`.
@@ -60,7 +60,7 @@ not fix the env either.
 
 `--copy-env` needs no wrapper, so detection is untouched: each entry above
 launches as a single foreground process, and julia's precompile child appears
-*earlier* in the list, exactly as `detect.lua:41-43` documents. Nothing here
+*earlier* in the list, exactly as `repl.lua`'s `cmdline` documents. Nothing here
 requires changing `procs[#procs]`, and nothing here needs 04's `hint`.
 
 ## Rejected
@@ -88,8 +88,8 @@ contains `--copy-env` in `send_spec.lua`.
 
 - `make test` passes
 - `<leader>rs` in an `r`, `python`, `julia`, `lua` and pymol buffer: each REPL
-  starts, and `kitty @ ls` shows one foreground process that the filetype's
-  `match.detect` names
+  starts, and `kitty @ ls` shows one foreground process resolving to a program
+  the filetype claims
 - `<leader>rr` onto that radian window resolves to `radian`, not nil
 - `printenv XDG_CONFIG_HOME` in a REPL launched for a filetype with no
   `config.command` entry
@@ -104,9 +104,10 @@ inherits nvim's environment, including `VIM`, `VIMRUNTIME`, `MYVIMRC` and
 
 ## Out of scope
 
-`detect.lua`'s `procs[#procs]`. It is wrong for any wrapper that survives — a
+`repl.lua`'s `cmdline`. It is wrong for any wrapper that survives — a
 hand-started `uv run --with ipython ipython` window reports the `uv` process last
-and detects as nil — but nothing this task does creates such a window.
+and resolves only because its title still reads `IPython:` — but nothing this
+task does creates such a window.
 
 `README.md:46-47` repeats the `--r-binary` string; 08 rewrites the README.
 

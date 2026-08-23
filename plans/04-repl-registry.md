@@ -83,10 +83,13 @@ it explicitly, because it stops such a window being claimable at all.
 
 ## Test
 
-Program resolution is pure `(cmdline, title) -> name|nil` and keeps
-`tests/plenary/detect_spec.lua`, whose fixtures are real `kitty @ ls` values —
-extend it with the four cases above rather than starting a second spec. Per-filetype
-claiming is a table lookup and needs no test of its own.
+Program resolution is pure — take the `kitty @ ls` window record, so the
+"which foreground process" rule is covered too — and keeps the fixtures of
+`tests/plenary/detect_spec.lua`, which are real `kitty @ ls` values. Extend them
+with the four cases above rather than starting a second spec, and rename the file
+after the module it now tests. Per-filetype claiming is a table lookup and needs
+no test of its own; `attach`'s refusals and the `pending` promotion need only a
+stubbed `kitty.window`.
 
 ## Verify
 

@@ -24,8 +24,9 @@ mismatches; and the `^%^` guard at `init.lua:79` exists only to stop a second
 Anchor at the use site in `parseScrollback` with a memo table. That removes the
 mutation, the re-entrancy guard and the setup-ordering dependency together.
 
-**Convert the seven `print` diagnostics to `vim.notify`** with appropriate levels:
-`detect.lua:22,57,79`; `scrollback.lua:139,154,193`; `commands.lua:229,235`.
+**Convert the remaining `print` diagnostics to `vim.notify`** with appropriate
+levels — re-derive them with `grep -n 'print(' lua/kittyREPL/*.lua`; tasks 03 and
+04 converted some of them already.
 `print` from a keymap callback is clobbered by the next message, and 09 adds
 `vim.notify` error paths that would otherwise sit inconsistently beside these.
 

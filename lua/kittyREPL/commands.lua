@@ -3,17 +3,34 @@ local M = {}
 
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
-local detect = require("kittyREPL.detect")
+local repl = require("kittyREPL.repl")
 local binding = require("kittyREPL.binding")
 
 local cmd = vim.cmd
 local fn = vim.fn
 
+---Send text to the buffer's REPL and execute it.
+---@param text string
+---@param raw boolean?
+local function run(text, raw)
+    local _, program = repl.current()
+    kitty.run(program, text, raw)
+end
+
+---Send text to the buffer's REPL without executing it.
+---@param text string
+---@param raw boolean?
+local function paste(text, raw)
+    local _, program = repl.current()
+    kitty.paste(program, text, raw)
+end
+
 ---Get the help command needed to prefix a help search term for the running REPL program.
+---@param program string|nil
 ---@param query string
 ---@return string?
-local function replHelpCmd(query)
-    local helpCmd = config.match.help[vim.b.repl_cmd] or "?"
+local function replHelpCmd(program, query)
+    local helpCmd = config.match.help[program] or "?"
     -- if the config.match.help entry for a program is a table, then it means
     -- we need to look for the current REPL prompt context to understand which
     -- prefix is appropriate.
@@ -51,36 +68,25 @@ function M.new()
         end
     end
     -- derived before launching so a bad command cannot leave an untitled window behind
-    local program = fn.fnamemodify(ftcommand:match("[^ ]+"), ":t"):lower()
+    local program = repl.progname(ftcommand:match("[^ ]+"))
     local win = kitty.launch(ftcommand)
     if not win then return end
     -- show id in the title so we can easily set it as target, but also start
     -- with the cmd like it would have been named if opened in a regular way.
     kitty.set_title(win, program .. " id=" .. win)
-    vim.b.repl_win = win
-    vim.b.repl_cmd = program
-end
-
----Bind the buffer to a REPL window and resolve which program runs there.
----@param win integer?
-local function attach(win)
-    if not win then return end
-    -- the identity resolved for a previously bound window does not carry over
-    vim.b.repl_cmd = nil
-    vim.b.repl_win = win
-    detect.detect_REPL { win }
+    repl.attach(win, program)
 end
 
 ---Manually set REPL as ith visible window from a prompt.
 function M.setI()
     local i = tonumber(fn.input("Window i: "))
     if not i then return end
-    attach(kitty.get_winid(i))
+    repl.attach(kitty.get_winid(i))
 end
 
 ---Set REPL window id from user input.
 function M.set()
-    attach(tonumber(fn.input("Window id: ")))
+    repl.attach(tonumber(fn.input("Window id: ")))
 end
 
 ---Set REPL window id to the last active window.
@@ -88,13 +94,13 @@ function M.setLast()
     local tab = kitty.get_focused_tab()
     if not tab then return end
     local history = tab.active_window_history
-    attach(history[#history])
+    repl.attach(history[#history])
 end
 
 ---Run the current line in the REPL.
 function M.runLine()
     for _ = 1, vim.v.count1 do
-        kitty.run(vim.api.nvim_get_current_line(), false)
+        run(vim.api.nvim_get_current_line(), false)
         if config.progress then
             cmd 'silent normal! j'
         end
@@ -104,7 +110,7 @@ end
 ---Paste the current line to the REPL.
 function M.pasteLine()
     for _ = 1, vim.v.count1 do
-        kitty.paste(vim.api.nvim_get_current_line(), false)
+        paste(vim.api.nvim_get_current_line(), false)
         if config.progress then
             cmd 'silent normal! j'
         end
@@ -139,7 +145,7 @@ local function runBinding(key, count)
     end
     local expr = M.iterateExpr(vim.bo.filetype, key, iterable, count)
     if not expr then return end
-    kitty.run(variable .. " = " .. expr)
+    run(variable .. " = " .. expr)
     -- progress to the next thing that would be sent, which is the next binding
     -- of a multi-binding header, else the loop body.
     if config.progress and nextpos then
@@ -161,7 +167,7 @@ end
 ---Run the visual selection in the REPL.
 function M.runVisual()
     cmd 'silent normal! "ky'
-    kitty.run(fn.getreg('k'))
+    run(fn.getreg('k'))
     if config.progress then
         cmd 'silent normal! `>'
     end
@@ -170,7 +176,7 @@ end
 ---Paste the visual selection to the REPL.
 function M.pasteVisual()
     cmd 'silent normal! "ky'
-    kitty.paste(fn.getreg('k'))
+    paste(fn.getreg('k'))
     if config.progress then
         cmd 'silent normal! `>'
     end
@@ -184,7 +190,7 @@ function M.runOperator(type)
     else
         cmd 'silent normal! `[V`]"ky'
     end
-    kitty.run(fn.getreg('k'))
+    run(fn.getreg('k'))
     if config.progress then
         cmd 'silent normal! `]w'
     end
@@ -198,7 +204,7 @@ function M.pasteOperator(type)
     else
         cmd 'silent normal! `[V`]"ky'
     end
-    kitty.paste(fn.getreg('k'))
+    paste(fn.getreg('k'))
     if config.progress then
         cmd 'silent normal! `]w'
     end
@@ -206,18 +212,20 @@ end
 
 ---Look up help for the word under the cursor.
 function M.help()
-    local helpcmd = replHelpCmd(fn.expand("<cword>"))
+    local _, program = repl.current()
+    local helpcmd = replHelpCmd(program, fn.expand("<cword>"))
     if helpcmd then
-        kitty.run(helpcmd, true)
+        run(helpcmd, true)
     end
 end
 
 ---Look up help for the visual selection.
 function M.helpVisual()
     cmd 'silent normal! "ky'
-    local helpcmd = replHelpCmd(fn.getreg('k'))
+    local _, program = repl.current()
+    local helpcmd = replHelpCmd(program, fn.getreg('k'))
     if helpcmd then
-        kitty.run(helpcmd, true)
+        run(helpcmd, true)
     end
     if config.progress then
         cmd 'silent normal! `>'

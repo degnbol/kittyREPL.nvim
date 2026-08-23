@@ -37,6 +37,17 @@ function M.get_focused_tab()
     end
 end
 
+---Get the `kitty @ ls` record for one window.
+---@param win integer
+---@return table|nil
+function M.window(win)
+    -- the --match=id: filter keeps the whole hierarchy, but "tabs" and "windows"
+    -- then hold one entry each.
+    local ls = M.ls("id:" .. win)
+    if not ls or not ls[1] or not ls[1].tabs or not ls[1].tabs[1] then return end
+    return ls[1].tabs[1].windows[1]
+end
+
 ---Get window id of the ith window visible on the current tab.
 ---@param i integer
 ---@return integer?
@@ -98,25 +109,27 @@ local function strcount(text, pattern)
 end
 
 ---Send text to the REPL with appropriate method based on config.
+---An unresolved program falls through to a raw send, the conservative default.
+---@param program string|nil program running in the REPL
 ---@param text string
 ---@param post string
 ---@param raw boolean?
-function M.send(text, post, raw)
+function M.send(program, text, post, raw)
     if config.closepager and M.detect_pager() then
         M.send_raw("q")
     end
     if raw then
         M.send_raw(text .. post)
     else
-        if config.custom[vim.b.repl_cmd] then
-            config.custom[vim.b.repl_cmd](text, post)
-        elseif config.bracketed[vim.b.repl_cmd] then
+        if config.custom[program] then
+            config.custom[program](text, post)
+        elseif config.bracketed[program] then
             if strcount(text, "\n") > 0 then
                 M.send_bracketed(text, post)
             else
                 M.send_raw(text .. post)
             end
-        elseif config.linewise[vim.b.repl_cmd] then
+        elseif config.linewise[program] then
             for _, line in ipairs(vim.split(text, '\n')) do
                 if line ~= "" then
                     M.send_raw(line .. '\n')
@@ -130,17 +143,19 @@ function M.send(text, post, raw)
 end
 
 ---Run text in the REPL (send with newline).
+---@param program string|nil
 ---@param text string
 ---@param raw boolean?
-function M.run(text, raw)
-    M.send(text, '\n', raw)
+function M.run(program, text, raw)
+    M.send(program, text, '\n', raw)
 end
 
 ---Paste text to the REPL (send without trailing newline).
+---@param program string|nil
 ---@param text string
 ---@param raw boolean?
-function M.paste(text, raw)
-    M.send(text:gsub('\n$', ''), '', raw)
+function M.paste(program, text, raw)
+    M.send(program, text:gsub('\n$', ''), '', raw)
     if config.editpaste then M.focus() end
 end
 

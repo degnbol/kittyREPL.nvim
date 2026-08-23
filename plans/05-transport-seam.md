@@ -7,8 +7,10 @@
 ## Do
 
 **Explicit window id on every `kitty.lua` function** — `kitty.send_raw(win, text)`,
-`kitty.get_scrollback(win)`, and so on — replacing the 11 sites that read
-`vim.b.repl_win`. Update callers in `commands.lua`, `detect.lua`, `scrollback.lua`.
+`kitty.get_scrollback(win)`, and so on — replacing the seven sites in `kitty.lua`
+that read `vim.b.repl_win`. Callers hold the id already: task 04 put the
+`repl.current()` lookup in the `run`/`paste` wrappers in `commands.lua` and in
+`scrollback`'s two entry points.
 
 **One subprocess helper** on `vim.system`:
 
@@ -21,22 +23,23 @@ string concatenation into a command line, real exit codes, and stderr no longer
 discarded by `2>/dev/null` (`kitty.lua:14`).
 
 Watch the exit-code semantics change — `design.md` § Transport, `os.execute`
-semantics. The `== 0` checks at `kitty.lua:71` and `kitty.lua:214` must become
+semantics. The `== 0` checks in `kitty.exists` and `kitty.interrupt` must become
 `:wait().code`; keeping `== 0` against a `vim.SystemCompleted` makes
 `kitty.exists` always false.
 
 `kitty.launch` still needs word splitting for user-authored `config.command`
 strings — `vim.split` on whitespace, not `sh`.
 
-**Replace `kitty.exists(win)` with `kitty.window(win)`** returning the
-`ls --match id:` record. That command exits 1 with empty stdout for a dead window,
-so it is a drop-in existence check, and the same record supplies
-`foreground_processes` for identity resolution and `in_alternate_screen` for 06.
+**Delete `kitty.exists(win)` in favour of `kitty.window(win)`**, which task 04
+added: the `ls --match id:` record it returns is empty for a dead window, so it is
+a drop-in existence check, and the same record supplies `foreground_processes` for
+identity resolution and `in_alternate_screen` for 06.
 
 This takes one `<CR>` from three kitty round-trips to two: `replCheck`'s existence
-check currently throws away everything it fetched. Round-trips cost ~21 ms each and
-`ls --match` is no cheaper than `get-text --match`, so justify this by the identity
-it returns in the same trip, not by speed.
+check currently throws away everything it fetched, and `repl.attach` then fetches
+the same record again. Round-trips cost ~21 ms each and `ls --match` is no cheaper
+than `get-text --match`, so justify this by the identity it returns in the same
+trip, not by speed.
 
 ## Test
 

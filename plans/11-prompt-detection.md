@@ -97,7 +97,7 @@ Re-learn when the cached pattern matches zero lines, which is how a mode switch
 
 ### 3. Cache in the task-04 registry
 
-`wins[win].prompt`, cleared by `repl.forget(win)`. Learn lazily on the first
+`wins[win].prompt`, dropped when the window is re-attached. Learn lazily on the first
 `scrollback.read`, not at attach: `kitty @ launch` returns before the prompt is
 drawn. A refusal must not be cached as a failure.
 
@@ -106,7 +106,7 @@ drawn. A refusal must not be cached as a failure.
 The learned pattern already carries `^` and the `()` position capture, so
 `parseScrollback`'s `lastline:sub(mPrompt)` is unchanged, and plan 07's "move the
 prompt anchoring out of `setup()`" is satisfied by deletion. Drop the totality
-assertion in `tests/plenary/detect_spec.lua:86-98` with it.
+assertion in `tests/plenary/repl_spec.lua` with it.
 
 Add `config.prompt = {}` — a program-keyed override, empty by default, for a REPL
 the observation cannot handle. What was wrong was the shipped values, not the
@@ -130,7 +130,8 @@ source intact, and record commands typed directly into the REPL:
 | ipython | `$IPYTHONDIR/profile_default/history.sqlite` | `select source_raw from history order by rowid desc` |
 
 `# mode:` separates `r`/`shell`/`browse` and `julia`/`shell`/`pkg`/`help` — the
-distinction `config.lua:141-143` says the patterns could not make. radian's
+distinction `config.match.prompt`'s own comment says the patterns could not make.
+radian's
 precedence is `prompt_session.py:114`: a cwd-local file wins, and only exists if
 the user opted in, so check the window's cwd first.
 
