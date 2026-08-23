@@ -18,7 +18,7 @@ chain — each plan states its own dependencies.
 | 05 ✓ | [Transport seam](plans/05-transport-seam.md) | 04 |
 | 06 ✓ | [Pager probe](plans/06-pager-probe.md) | 05 |
 | 07 ✓ | [`setup()` hygiene](plans/07-setup-hygiene.md) | 05 |
-| 08 | [README](plans/08-readme.md) | 02, 04, 05, 07 |
+| 08 ✓ | [README](plans/08-readme.md) | 02, 04, 05, 07 |
 | 09 | [REPL context sync](plans/09-context-sync.md) | 02, 04 |
 | 10 | [Launch environment](plans/10-launch-env.md) | — |
 | 11 | [Runtime prompt detection](plans/11-prompt-detection.md) | 04, 05 |
