@@ -9,12 +9,21 @@ local binding = require("kittyREPL.binding")
 local cmd = vim.cmd
 local fn = vim.fn
 
+---Quit a pager holding the REPL, so what follows reaches a prompt.
+---@param win integer
+local function closePager(win)
+    if config.closepager and kitty.detect_pager(win) then
+        kitty.send_raw(win, "q")
+    end
+end
+
 ---Send text to the buffer's REPL and execute it.
 ---@param text string
 ---@param raw boolean?
 local function run(text, raw)
     local win, program = repl.current()
     if not win then return end
+    closePager(win)
     kitty.run(win, program, text, raw)
 end
 
@@ -24,6 +33,7 @@ end
 local function paste(text, raw)
     local win, program = repl.current()
     if not win then return end
+    closePager(win)
     kitty.paste(win, program, text, raw)
 end
 

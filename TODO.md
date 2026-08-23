@@ -16,7 +16,7 @@ chain — each plan states its own dependencies.
 | 03 ✓ | [Treesitter loop-variable extraction](plans/03-iterate-treesitter.md) | 01 |
 | 04 ✓ | [REPL registry](plans/04-repl-registry.md) | 02, 03 |
 | 05 ✓ | [Transport seam](plans/05-transport-seam.md) | 04 |
-| 06 | [Pager probe](plans/06-pager-probe.md) | 05 |
+| 06 ✓ | [Pager probe](plans/06-pager-probe.md) | 05 |
 | 07 | [`setup()` hygiene](plans/07-setup-hygiene.md) | 05 |
 | 08 | [README](plans/08-readme.md) | 02, 04, 05, 07 |
 | 09 | [REPL context sync](plans/09-context-sync.md) | 02, 04 |

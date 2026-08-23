@@ -27,6 +27,38 @@ local function open(ft, lines, cursor)
     vim.b.repl_win = 7
 end
 
+describe("commands pager probe", function()
+    local probes, raw
+    before_each(function()
+        probes, raw = 0, {}
+        config.closepager = true
+        kitty.detect_pager = function() probes = probes + 1; return true end
+        kitty.send_raw = function(_, text) table.insert(raw, text) end
+    end)
+    after_each(function()
+        config.closepager = false
+    end)
+
+    it("probes once per action, where sending probed once per send", function()
+        open("python", { "1 + 1" }, { 1, 0 })
+        commands.runLine()
+        assert.are.equal(1, probes)
+    end)
+
+    it("quits the pager before sending", function()
+        open("python", { "1 + 1" }, { 1, 0 })
+        commands.pasteLine()
+        assert.are.same({ "q", "1 + 1" }, raw)
+    end)
+
+    it("does not probe with closepager off", function()
+        config.closepager = false
+        open("python", { "1 + 1" }, { 1, 0 })
+        commands.runLine()
+        assert.are.equal(0, probes)
+    end)
+end)
+
 describe("commands.runLineFor", function()
     it("sends the first element of the iterable, iterator or not", function()
         open("python", { "for scene, _arrows in zip(scenes, arrows, strict=True):", "    pass" }, { 1, 0 })

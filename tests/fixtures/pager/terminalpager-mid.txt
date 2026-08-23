@@ -1,0 +1,26 @@
+  Symbol(x...) -> Symbol
+
+  Create a Symbol by concatenating the string representations of the arguments together.
+
+  Examples
+  ≡≡≡≡≡≡≡≡
+
+  julia> Symbol("my", "name")
+  :myname
+  
+  julia> Symbol("day", 4)
+  :day4
+
+  ────────────────────────────────────────────────────────────────────────────────────────────
+
+  Symbol
+
+  The type of object used to represent identifiers in parsed julia code (ASTs). Also often
+  used as a name or label to identify an entity (e.g. as a dictionary key). Symbols can be
+  entered using the : quote operator:
+
+  julia> :name
+  :name
+  
+  julia> typeof(:name)
+:                                                            (↑ ↓ ← →:move, ?:help, q:quit)  60%[?25h[26;2H[?12h

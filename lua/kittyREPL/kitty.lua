@@ -136,9 +136,6 @@ end
 ---@param post string
 ---@param raw boolean? send as if the program were unknown
 function M.send(win, program, text, post, raw)
-    if config.closepager and M.detect_pager(win) then
-        M.send_raw(win, "q")
-    end
     -- an unknown program is already the raw fallthrough, so asking for a raw
     -- send is the same as forgetting which program this is
     if raw then program = nil end
@@ -181,12 +178,12 @@ function M.paste(win, program, text, raw)
     if config.editpaste then M.focus(win) end
 end
 
----Detect whether the REPL is currently displaying a pager (e.g. help texts).
----@param win integer
+---Whether a screen ends in a pager's prompt with the cursor sitting in it.
+---Anchoring on the cursor is what separates a pager from paged-looking text left
+---behind by one that has quit.
+---@param screen string `kitty @ get-text --extent=screen --add-cursor` output
 ---@return boolean
-function M.detect_pager(win)
-    local scrollback = get_text(win, "--extent=screen", "--add-cursor")
-    if not scrollback then return false end
+function M.is_pager(screen)
     -- Get cursor position to check if it is placed right after a pager pattern to match.
     -- Lua pattern explanation:
     -- Matched pattern is ^[[?25h^[[n;mH^[[?12h where
@@ -194,7 +191,7 @@ function M.detect_pager(win)
     -- n is an integer indicating cursor row and m indicates cursor column. Both 1-indexed.
     -- ^[[?25h means "show the cursor". I don't know what ^[[?12h does.
     -- https://en.wikipedia.org/wiki/ANSI_escape_code
-    local helplines, lastline, blanklines, r, c = scrollback:match(
+    local helplines, lastline, blanklines, r, c = screen:match(
         "(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
     -- if we aren't scrolled to the bottom lastline will be nil.
     if lastline == nil then return false end
@@ -205,6 +202,15 @@ function M.detect_pager(win)
     local _, nlines = helplines:gsub('\n', '')
     -- +2 since "lines" doesn't contain "lastline" and the newline right before it.
     return tonumber(r) == nlines + 2 and tonumber(c) == #pagerMatch + 1
+end
+
+---Whether the REPL is currently displaying a pager (e.g. help texts).
+---One `kitty @ get-text` round trip, so this belongs per user action, not per send.
+---@param win integer
+---@return boolean
+function M.detect_pager(win)
+    local screen = get_text(win, "--extent=screen", "--add-cursor")
+    return screen ~= nil and M.is_pager(screen)
 end
 
 ---Get scrollback text from the REPL.

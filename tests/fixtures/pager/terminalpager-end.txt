@@ -1,0 +1,26 @@
+  The type of object used to represent identifiers in parsed julia code (ASTs). Also often
+  used as a name or label to identify an entity (e.g. as a dictionary key). Symbols can be
+  entered using the : quote operator:
+
+  julia> :name
+  :name
+  
+  julia> typeof(:name)
+  Symbol
+  
+  julia> x = 42
+  42
+  
+  julia> eval(:x)
+  42
+
+  Symbols can also be constructed from strings or other values by calling the constructor
+  Symbol(x...).
+
+  Symbols are immutable and their implementation re-uses the same object for all Symbols with
+  the same name.
+
+  Unlike strings, Symbols are "atomic" or "scalar" entities that do not support iteration over
+  characters.
+
+:                                                            (↑ ↓ ← →:move, ?:help, q:quit) 100%[?25h[26;2H[?12h
