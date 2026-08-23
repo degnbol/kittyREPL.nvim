@@ -9,6 +9,8 @@ make test
 ```
 
 This clones plenary into `rtps/` on first run, then executes all `tests/plenary/*_spec.lua` files.
+The binding specs parse real code, so they need the python, julia and r treesitter parsers installed
+in `stdpath("data")/site`.
 
 Run a single test file:
 ```zsh

@@ -3,7 +3,7 @@
 -- The per-language tables below are keyed on one of two axes. Which one is not
 -- visible at a call site, so it is recorded per table:
 -- * filetype, i.e. the file being edited:
---   exclude, command, command_count, match.detect
+--   exclude, command, command_count, iterate, match.detect
 -- * program, i.e. what runs in the REPL window:
 --   bracketed, linewise, custom, match.prompt, match.help
 -- match.detect bridges the two: it is keyed by filetype and returns a program
@@ -75,6 +75,18 @@ local M = {
     -- Additional to command, when given a vim.v.count
     command_count = {
         julia = " -t ",
+    },
+    -- Filetype-keyed expressions taking an element out of an iterable, used to
+    -- run a single iteration of a loop. "first" is used by runLineFor, "index"
+    -- by runLineForI with the count as index, defaulting to "base".
+    -- The iterables are wrapped rather than indexed directly, since a python
+    -- zip/enumerate/generator is not subscriptable and neither is a julia zip.
+    -- R needs the parentheses because [[ binds tighter than :, so 1:10[[1]] is
+    -- 1:(10[[1]]), i.e. the whole vector rather than its first element.
+    iterate = {
+        python = { first = "next(iter(%s))", index = "list(iter(%s))[%d]", base = 0 },
+        julia  = { first = "first(%s)",      index = "collect(%s)[%d]",    base = 1 },
+        r      = { first = "(%s)[[1]]",      index = "(%s)[[%d]]",         base = 1 },
     },
     -- language specific matching
     match = {

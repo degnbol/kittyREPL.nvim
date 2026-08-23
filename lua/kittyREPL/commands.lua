@@ -4,16 +4,17 @@ local M = {}
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local detect = require("kittyREPL.detect")
+local binding = require("kittyREPL.binding")
 
 local cmd = vim.cmd
 local fn = vim.fn
 
----Get the help command needed to prefix a help search term for the current language.
+---Get the help command needed to prefix a help search term for the running REPL program.
 ---@param query string
 ---@return string?
 local function replHelpCmd(query)
-    local helpCmd = config.match.help[vim.bo.filetype] or "?"
-    -- if the config.match.help entry for a language is a table, then it means
+    local helpCmd = config.match.help[vim.b.repl_cmd] or "?"
+    -- if the config.match.help entry for a program is a table, then it means
     -- we need to look for the current REPL prompt context to understand which
     -- prefix is appropriate.
     if type(helpCmd) ~= "table" then return helpCmd .. query end
@@ -33,28 +34,6 @@ local function replHelpCmd(query)
                 else
                     return _helpCmd .. query
                 end
-            end
-        end
-    end
-end
-
--- Just Julia for now
-local function parseVariableIterable(line)
-    for _, pVar in ipairs({ "[%w_]+", "%b()" }) do
-        -- order matters, e.g. `x in func(arg1, arg2)` would also be matched by "%w+"
-        for _, pIter in ipairs({ "[%w_.]+%b()", "[%w_.]+", "%b()", "%b[]" }) do
-            local variable, iterable
-            variable, iterable = line:match("(" .. pVar .. ") in (" .. pIter .. ")")
-            if variable ~= nil then
-                return variable, iterable
-            end
-            variable, iterable = line:match("(" .. pVar .. ") = (" .. pIter .. ")")
-            if variable ~= nil then
-                return variable, iterable
-            end
-            variable, iterable = line:match("(" .. pVar .. ") ∈ (" .. pIter .. ")")
-            if variable ~= nil then
-                return variable, iterable
             end
         end
     end
@@ -82,14 +61,26 @@ function M.new()
     vim.b.repl_cmd = program
 end
 
+---Bind the buffer to a REPL window and resolve which program runs there.
+---@param win integer?
+local function attach(win)
+    if not win then return end
+    -- the identity resolved for a previously bound window does not carry over
+    vim.b.repl_cmd = nil
+    vim.b.repl_win = win
+    detect.detect_REPL { win }
+end
+
 ---Manually set REPL as ith visible window from a prompt.
 function M.setI()
-    vim.b.repl_win = kitty.get_winid(tonumber(fn.input("Window i: ")))
+    local i = tonumber(fn.input("Window i: "))
+    if not i then return end
+    attach(kitty.get_winid(i))
 end
 
 ---Set REPL window id from user input.
 function M.set()
-    vim.b.repl_win = tonumber(fn.input("Window id: "))
+    attach(tonumber(fn.input("Window id: ")))
 end
 
 ---Set REPL window id to the last active window.
@@ -97,11 +88,7 @@ function M.setLast()
     local tab = kitty.get_focused_tab()
     if not tab then return end
     local history = tab.active_window_history
-    vim.b.repl_win = history[#history]
-    if not detect.detect_REPL { vim.b.repl_win } then
-        -- fallback
-        vim.b.repl_cmd = vim.bo.filetype
-    end
+    attach(history[#history])
 end
 
 ---Run the current line in the REPL.
@@ -124,31 +111,51 @@ function M.pasteLine()
     end
 end
 
-local ft_iterate = { julia = "first", python = "next" }
+---Expression taking an element out of an iterable in the given language.
+---@param ft string
+---@param key "first"|"index"
+---@param iterable string
+---@param count integer|nil index for "index", defaulting to the filetype's base index
+---@return string|nil expr
+function M.iterateExpr(ft, key, iterable, count)
+    local spec = config.iterate[ft]
+    local index = count or (spec or {}).base
+    if not spec or not spec[key] or (key == "index" and not index) then
+        vim.notify("REPL: no iterate." .. key .. " expression for " .. ft, vim.log.levels.WARN)
+        return
+    end
+    return spec[key]:format(iterable, index)
+end
 
----Run the current line as a for-loop iteration (using first()/next()).
-function M.runLineFor()
-    local variable, iterable = parseVariableIterable(vim.api.nvim_get_current_line())
-    local torun = variable .. " = " .. ft_iterate[vim.bo.filetype] .. "(" .. iterable .. ")"
-    kitty.run(torun, true)
-    if config.progress then
-        cmd 'silent normal! j'
+---Assign the variable of the binding at the cursor one element of its iterable.
+---@param key "first"|"index"
+---@param count integer|nil
+local function runBinding(key, count)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local variable, iterable, nextpos = binding.at(0, cursor[1] - 1, cursor[2])
+    if not variable or not iterable then
+        vim.notify("REPL: no loop binding found at the cursor", vim.log.levels.WARN)
+        return
+    end
+    local expr = M.iterateExpr(vim.bo.filetype, key, iterable, count)
+    if not expr then return end
+    kitty.run(variable .. " = " .. expr)
+    -- progress to the next thing that would be sent, which is the next binding
+    -- of a multi-binding header, else the loop body.
+    if config.progress and nextpos then
+        vim.api.nvim_win_set_cursor(0, { nextpos[1] + 1, nextpos[2] })
     end
 end
 
-local ft_indexing = { julia = 1, python = 0, r = 1 }
+---Run the first iteration of the loop at the cursor.
+function M.runLineFor()
+    runBinding("first")
+end
 
----Same as runLineFor but instead of using next etc. assuming iterator we use indexing.
----Count is used for the index. If not given explicitly it will default to 1 or
----0 depending on if the language is 1 or 0-indexed.
+---Run the vim.v.count'th iteration of the loop at the cursor.
+---Without a count the language's first index is used.
 function M.runLineForI()
-    local count = vim.v.count > 0 and vim.v.count or ft_indexing[vim.bo.filetype]
-    local variable, iterable = parseVariableIterable(vim.api.nvim_get_current_line())
-    local torun = variable .. " = " .. iterable .. "[" .. count .. "]"
-    kitty.run(torun, true)
-    if config.progress then
-        cmd 'silent normal! j'
-    end
+    runBinding("index", vim.v.count > 0 and vim.v.count or nil)
 end
 
 ---Run the visual selection in the REPL.

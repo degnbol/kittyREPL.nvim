@@ -13,7 +13,7 @@ chain — each plan states its own dependencies.
 | 00 ✓ | Commit the working tree | — |
 | 01 ✓ | Crash fixes and dead code | 00 |
 | 02 ✓ | [One program-name namespace](plans/02-program-namespace.md) | 01 |
-| 03 | [Treesitter loop-variable extraction](plans/03-iterate-treesitter.md) | 01 |
+| 03 ✓ | [Treesitter loop-variable extraction](plans/03-iterate-treesitter.md) | 01 |
 | 04 | [REPL registry](plans/04-repl-registry.md) | 02, 03 |
 | 05 | [Transport seam](plans/05-transport-seam.md) | 04 |
 | 06 | [Pager probe](plans/06-pager-probe.md) | 05 |
