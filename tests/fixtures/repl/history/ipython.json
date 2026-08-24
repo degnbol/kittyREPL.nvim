@@ -1,0 +1,4 @@
+[{"source_raw":"f()"},
+{"source_raw":"def f():\n    return 1\n    "},
+{"source_raw":"x"},
+{"source_raw":"x = 1"}]

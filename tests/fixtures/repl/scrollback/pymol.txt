@@ -1,0 +1,13 @@
+print("ready")
+PyMOL>set internal_gui_mode, 1
+ Setting: internal_gui_mode set to 1.
+PyMOL>set internal_gui_name_color_mode, 1
+ Setting: internal_gui_name_color_mode set to 1.
+PyMOL>set overlay, 2
+ Setting: overlay set to 2.
+PyMOL>set seq_view
+ Setting: seq_view set to on.
+PyMOL>cmd.set_key("CTRL-W", cmd.quit)
+PyMOL>cmd.set_key("CTRL-Q", cmd.quit)
+PyMOL>print("ready")
+ready

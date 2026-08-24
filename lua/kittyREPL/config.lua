@@ -5,7 +5,7 @@
 -- * filetype, i.e. the file being edited:
 --   exclude, command, command_count, iterate, programs
 -- * program, i.e. what runs in the REPL window:
---   bracketed, linewise, custom, context, variables, assign, match.prompt,
+--   bracketed, linewise, custom, context, variables, assign, prompt, history,
 --   match.help
 -- programs bridges the two: it is keyed by filetype and its values are program
 -- names. A program name and a filetype coincide for some languages (julia, lua)
@@ -16,6 +16,8 @@
 local function kitty()
     return require("kittyREPL.kitty")
 end
+
+local history = require("kittyREPL.history")
 
 local M = {
     -- Set keymaps in setup call or map something to these <plug> maps.
@@ -162,24 +164,16 @@ local M = {
         julia  = { first = "first(%s)",      index = "collect(%s)[%d]",    base = 1 },
         r      = { first = "(%s)[[1]]",      index = "(%s)[[%d]]",         base = 1 },
     },
+    -- Program-keyed prompt overrides, a Lua pattern for the prompt at the start
+    -- of a line, e.g. python = ">>> ". Empty by default: every prompt here is
+    -- the user's own REPL configuration, so no shipped value can be right, and
+    -- one is read off the running window instead.
+    prompt = {},
+    -- Program-keyed history file readers, for the REPLs that write one as they
+    -- go. See history.lua for the shape of an entry and the shipped defaults.
+    history = history.readers,
     -- language specific matching
     match = {
-        -- Program-keyed patterns to match for prompt start and continuation.
-        prompt = {
-            -- this will not understand pkg prompts on the form (ENV) pkg>
-            -- This should be fine for grabbing cmd inputs but not for grabbing
-            -- outputs, if we were to want that. A solution would be a table of patterns, with a second pkg pattern.
-            julia = { "%a*%??> ", "  " },
-            radian = { "> ", "  " },
-            r = { "> ", "+ " },
-            python = { ">>> ", "... " },
-            ipython = { "In %[%d+%]: ", " +...: " },
-            zsh = { "❯ ", "%a*> " }, -- e.g. for>
-            sh = { "❯ ", "%a*> " },
-            bash = { "[%w.-]*$ ", "> " },
-            lua = { "> ", ">> " },
-            pymol = { "", "" },
-        },
         -- Program-keyed help command, often a "?" prefix.
         -- For each program provide either a help command prefix string, a two element array with prefix and suffix,
         -- or a key-value table where each key will be matched against the last prompt (from first to last key).

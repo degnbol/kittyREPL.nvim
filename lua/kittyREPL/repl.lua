@@ -9,10 +9,12 @@ local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local message = require("kittyREPL.message")
 
--- [win] = { program = "radian"|nil, pending = "radian"|nil, sent = {}|nil }
+-- [win] = { program = "radian"|nil, pending = "radian"|nil, sent = {}|nil,
+--           prompt = "^R❯ ()"|nil }
 -- `pending` is the launch word, standing in until resolution succeeds:
 -- `kitty @ launch` returns before the program appears in foreground_processes.
 -- `sent` is the context-sync memo, described at M.sent.
+-- `prompt` is the pattern learned at M.remember_prompt.
 local wins = {}
 
 ---Program name a command word invokes.
@@ -93,7 +95,8 @@ local function remember(win, program)
     if not program then return end
     local state = wins[win] or {}
     -- a different program is a different REPL, whatever it has been told before
-    if state.program ~= program then state.sent = nil end
+    -- and whatever it used to prompt with
+    if state.program ~= program then state.sent, state.prompt = nil, nil end
     state.program, state.pending = program, nil
     wins[win] = state
 end
@@ -171,6 +174,25 @@ function M.sent(win)
     state.sent = state.sent or {}
     wins[win] = state
     return state.sent
+end
+
+---Pattern a window's REPL prompts with, once one has been learned.
+---@param win integer
+---@return string|nil
+function M.prompt(win)
+    local state = wins[win]
+    return state and state.prompt
+end
+
+---Cache the prompt pattern learned for a window.
+---Dropped when a launch re-attaches the window or its program resolves to a
+---different name, both of which mean a REPL that need not prompt the same way.
+---@param win integer
+---@param pattern string
+function M.remember_prompt(win, pattern)
+    local state = wins[win] or {}
+    state.prompt = pattern
+    wins[win] = state
 end
 
 ---The window this buffer sends to.

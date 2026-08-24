@@ -65,7 +65,7 @@ silently ignored.
 
 | keyed by filetype — the file you edit | keyed by program — what runs in the REPL window |
 |---|---|
-| `exclude`, `command`, `command_count`, `iterate` | `bracketed`, `linewise`, `custom`, `context`, `variables`, `assign`, `match.prompt`, `match.help` |
+| `exclude`, `command`, `command_count`, `iterate` | `bracketed`, `linewise`, `custom`, `context`, `variables`, `assign`, `prompt`, `history`, `match.help` |
 
 `programs` bridges the two: it is keyed by filetype and its values are program
 names. A name and a filetype coincide for some languages (`julia`, `lua`) and
@@ -115,9 +115,15 @@ differ for others — an `r` buffer usually drives `radian`.
   where `post` is `"\n"` for run and `""` for paste. The default entries wrap
   pymol multi-line input in `python … python end`, strip top-level `local` for
   lua, and force julia bracketed even on one line.
-- **`match.prompt`** — `{ prompt, continuation }` Lua patterns, anchored at the
-  line start, used to cut commands out of the scrollback. The julia default does
-  not understand a parenthesised environment prefix, as in `(env) pkg>`.
+- **`prompt`** — Lua pattern for the prompt a program draws, used to cut commands
+  out of its scrollback. Empty by default and rarely worth setting: every prompt
+  here is the user's own REPL configuration, so the pattern is read off the
+  running window instead, as described under [Recall](#recall).
+- **`history`** — `{ path, read, parse }` for a program that writes a history
+  file as it goes. `path(win)` names the file, `read(path)` reads it — defaulting
+  to the file's last 500 lines — and `parse(text)` cuts it into entries, most
+  recent first, each a list of lines. Shipped for the three shells, julia, radian
+  and ipython, in `lua/kittyREPL/history.lua`.
 - **`match.help`** — the program's help command: a prefix string (`r = "?"`), a
   `{ prefix, suffix }` pair (`python = { "help(", ")" }`), or a table mapping a
   prompt pattern to either of those. A table is resolved against the scrollback,
@@ -196,16 +202,32 @@ top level — as running it as a script would, if it guards on `__name__`.
 `scrollUp`/`scrollDown` are visual mode, so one lhs can serve `scrollStart` and
 `scrollUp` both.
 
-When the REPL runs a shell, those three read the shell's own history file rather
-than the kitty window, and so reach commands from before the window opened.
+### Recall
+
+Those three walk backwards through the commands the REPL was given, from one of
+two sources.
+
+A program with a `history` entry is read from its own history file. That reaches
+commands from before the window opened, keeps a multi-line command whole, and
+gives the source as it was typed rather than as the REPL echoed it. Two windows
+running the same program share one file, so recall in either shows what was typed
+in both.
+
+Every other program is read off the kitty window, which needs the prompt it draws
+to tell a command apart from output. That prompt is measured on first use, from
+where the window leaves its cursor, and confirmed against the rest of the screen
+before it is used — the accepted value is reported once per window. A REPL busy
+with a computation, or sitting in a pager, has no prompt to measure and recall
+says so. Off the screen a multi-line command recalls as its first line, the
+continuation prompt not being measurable this way.
 
 ## Adding a language
 
 1. Add the filetype to `programs`, mapping it to the program names its REPL may
    run.
 2. Give it a `command` if a new REPL window should not just be a shell.
-3. Add `match.prompt` and `match.help` under the program names, for the
-   scrollback and help maps.
+3. Add `match.help` under the program names, for the help map. Recall needs
+   nothing, unless the REPL keeps a history file worth a `history` entry.
 4. Set `bracketed`, `linewise` or `custom` under the program name if a plain
    multi-line send does not work.
 

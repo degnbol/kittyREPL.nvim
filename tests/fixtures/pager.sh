@@ -20,7 +20,7 @@ waitfor() {
     exit 1
 }
 
-win=$(kitty @ launch --cwd=/tmp --keep-focus julia)
+win=$(kitty @ launch --type=tab --cwd=/tmp --keep-focus julia)
 waitfor '❯'
 send '@help print
 '
@@ -34,7 +34,7 @@ waitfor '❯ *$'
 capture julia-prompt
 kitty @ close-window --match=id:$win
 
-win=$(kitty @ launch --cwd=/tmp --keep-focus)
+win=$(kitty @ launch --type=tab --cwd=/tmp --keep-focus)
 waitfor '❯'
 send 'seq 1 100 | less
 '

@@ -1,0 +1,14 @@
+
+# time: 2026-08-24 10:25:34 UTC
+# mode: r
++x <- 1
+
+# time: 2026-08-24 10:25:34 UTC
+# mode: shell
++ls
+
+# time: 2026-08-24 10:25:35 UTC
+# mode: r
++for (i in 1:2) {
++    print(i)
++}

@@ -185,20 +185,3 @@ describe("repl.sent", function()
         assert.are.same({}, repl.sent(11))
     end)
 end)
-
-describe("program names", function()
-    -- match.prompt is the one program-keyed table that has to be total:
-    -- scrollback.parseScrollback refuses to parse without a prompt pattern,
-    -- where bracketed/linewise/help all have a meaningful missing case.
-    local config = require("kittyREPL.config")
-    local claimed = {}
-    for _, programs in pairs(config.programs) do
-        for name in pairs(programs) do claimed[name] = true end
-    end
-
-    for name in pairs(claimed) do
-        it("has a prompt pattern for " .. name, function()
-            assert.is_not_nil(config.match.prompt[name])
-        end)
-    end
-end)

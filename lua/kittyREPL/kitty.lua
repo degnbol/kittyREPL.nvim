@@ -179,22 +179,39 @@ function M.paste(win, program, text, raw)
     if config.editpaste then M.focus(win) end
 end
 
+-- What `--add-cursor` appends, straight after the text with no separator:
+-- ^[ is ESC and ^[[ is CSI (Control Sequence Introducer)
+-- ^[[?25h means "show the cursor"
+-- ^[[n;mH places it at row n, column m, both 1-indexed
+-- ^[[?12h and ^[[?12l set and reset its blink -- both appear, a pager giving h
+-- and the prompt_toolkit REPLs (radian, ipython) giving l
+-- https://en.wikipedia.org/wiki/ANSI_escape_code
+local CURSOR = "%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+[hl]"
+
+---Split a screen into its text and the cursor position reported after it.
+---@param screen string `kitty @ get-text --extent=screen --add-cursor` output
+---@return string|nil text nil when no cursor was reported
+---@return integer|nil row 1-indexed line of text the cursor sits on
+---@return integer|nil col
+local function cursor(screen)
+    local text, row, col = screen:match("^(.*)" .. CURSOR .. "\n$")
+    if not text then return end
+    return text, tonumber(row), tonumber(col)
+end
+
 ---Whether a screen ends in a pager's prompt with the cursor sitting in it.
 ---Anchoring on the cursor is what separates a pager from paged-looking text left
 ---behind by one that has quit.
 ---@param screen string `kitty @ get-text --extent=screen --add-cursor` output
 ---@return boolean
 function M.is_pager(screen)
-    -- Get cursor position to check if it is placed right after a pager pattern to match.
-    -- Lua pattern explanation:
-    -- Matched pattern is ^[[?25h^[[n;mH^[[?12h where
-    -- ^[ is ESC and ^[[ is known as CSI (Control Sequence Introducer)
-    -- n is an integer indicating cursor row and m indicates cursor column. Both 1-indexed.
-    -- ^[[?25h means "show the cursor". I don't know what ^[[?12h does.
-    -- https://en.wikipedia.org/wiki/ANSI_escape_code
-    local helplines, lastline, blanklines, r, c = screen:match(
-        "(.*)\n([^\n]+)(\n*)%c%[%?25h%c%[(%d+);(%d+)H%c%[%?%d+h\n$")
+    local text, r, c = cursor(screen)
+    if not text then return false end
+    -- the row is compared against a count of newlines below, which a line long
+    -- enough to wrap breaks -- kitty returns one of those as a single line. See
+    -- M.prompt_at_cursor, which reads a row it cannot trust the index of.
     -- if we aren't scrolled to the bottom lastline will be nil.
+    local helplines, lastline, blanklines = text:match("^(.*)\n([^\n]+)(\n*)$")
     if lastline == nil then return false end
     local pagerMatch = lastline:match("^(:)")
     if pagerMatch and #blanklines > 0 then return false end
@@ -202,7 +219,39 @@ function M.is_pager(screen)
     if not pagerMatch then return false end
     local _, nlines = helplines:gsub('\n', '')
     -- +2 since "lines" doesn't contain "lastline" and the newline right before it.
-    return tonumber(r) == nlines + 2 and tonumber(c) == #pagerMatch + 1
+    return r == nlines + 2 and c == #pagerMatch + 1
+end
+
+---The prompt a REPL is sitting at, as it is rendered on screen.
+---Taken as the last line with anything on it rather than the cursor's row: the
+---cursor is reported as a screen row, while a line long enough to wrap comes
+---back as one line, so the two stop lining up. A REPL waiting for input has
+---drawn nothing below its prompt.
+---Right-padded to the cursor's column, kitty dropping a line's trailing blanks
+---so that a prompt ending in one comes back short.
+---@param screen string `kitty @ get-text --extent=screen --add-cursor` output
+---@return string|nil nil in column 1, where nothing was drawn for the cursor to
+---sit after: a REPL busy with a computation, or one that draws no prompt at all
+function M.prompt_at_cursor(screen)
+    local text, _, col = cursor(screen)
+    if not text or col == 1 then return end
+    local prompt
+    for line in vim.gsplit(text, "\n") do
+        if vim.trim(line) ~= "" then prompt = line end
+    end
+    if not prompt then return end
+    local pad = col - 1 - vim.fn.strdisplaywidth(prompt)
+    -- wider than the cursor's column, so the cursor is not at the end of this
+    -- line and it is not a prompt waiting to be typed after
+    if pad < 0 then return end
+    return prompt .. string.rep(" ", pad)
+end
+
+---Read a REPL's screen with its cursor position appended.
+---@param win integer
+---@return string?
+function M.get_screen(win)
+    return get_text(win, "--extent=screen", "--add-cursor")
 end
 
 ---Whether the REPL is currently displaying a pager (e.g. help texts).
@@ -210,7 +259,7 @@ end
 ---@param win integer
 ---@return boolean
 function M.detect_pager(win)
-    local screen = get_text(win, "--extent=screen", "--add-cursor")
+    local screen = M.get_screen(win)
     return screen ~= nil and M.is_pager(screen)
 end
 

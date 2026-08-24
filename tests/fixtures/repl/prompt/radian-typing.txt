@@ -1,0 +1,58 @@
+R version 4.5.0 (2025-04-11) -- "How About a Twenty-Six"
+Platform: aarch64-apple-darwin20 (64-bit)
+
+R❯ x <- 1
+
+!❯ ls
+ipython
+
+R❯ for (i in 1:2) {
+       print(i)
+   }
+[1] 1
+[1] 2
+
+R❯ x <- 1 + 
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ [?25h[15;13H[?12l

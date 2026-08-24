@@ -1,0 +1,10 @@
+Python 3.9.6 (default, May 22 2026, 11:13:45) 
+[Clang 21.0.0 (clang-2100.1.1.101)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+>>> x = 1
+>>> def f():
+...     return 1
+... 
+>>> f()
+1
+>>>

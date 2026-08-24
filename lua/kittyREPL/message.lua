@@ -17,6 +17,14 @@ function M.status(msg)
     vim.api.nvim_echo({ { PREFIX .. msg } }, false, { id = "kittyREPL.status" })
 end
 
+---Report something worth auditing later that is not a problem, e.g. a value the
+---plugin worked out for itself. Reaches the message history, where a status does
+---not survive the next keypress.
+---@param msg string
+function M.info(msg)
+    vim.notify(PREFIX .. msg, vim.log.levels.INFO)
+end
+
 ---Report a problem, which must survive whatever the next keypress writes.
 ---@param msg string
 function M.warn(msg)
