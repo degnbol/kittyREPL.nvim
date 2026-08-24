@@ -2,6 +2,7 @@
 -- cmdlines and titles are real `kitty @ ls` foreground_processes/title values.
 local repl = require("kittyREPL.repl")
 local kitty = require("kittyREPL.kitty")
+local config = require("kittyREPL.config")
 
 ---A `kitty @ ls` window record with one foreground process.
 ---@param title string
@@ -78,6 +79,15 @@ describe("repl.resolve", function()
 
     it("leaves an unclaimed program unnamed", function()
         assert.is_nil(repl.resolve(window("notes.md", "/usr/bin/nvim", "notes.md")))
+    end)
+
+    it("walks past a filetype whose programs the user dropped with false", function()
+        -- an unclaimed name, so every entry is visited whatever order pairs takes
+        local programs = config.programs.python
+        config.programs.python = false
+        local ok, err = pcall(repl.resolve, window("notes.md", "/usr/bin/nvim", "notes.md"))
+        config.programs.python = programs
+        assert.is_true(ok, tostring(err))
     end)
 
     it("names the last foreground process, past helpers spawned by the REPL", function()
@@ -175,6 +185,26 @@ describe("repl.sent", function()
         kitty.window = function() return window("ipython id=10", "/bin/python3", "/bin/ipython") end
         repl.attach(10)
         assert.are.same({}, repl.sent(10))
+    end)
+
+    it("keeps what a launch was told once the hint is borne out", function()
+        -- the hint is what the window is sending under until it resolves, so a
+        -- resolution agreeing with it is the same REPL, not a new one
+        kitty.window = function() return { id = 12, title = "julia id=12", foreground_processes = {} } end
+        repl.attach(12, "julia")
+        repl.sent(12)["ctx:revise"] = "using Revise"
+        kitty.window = function() return window("julia id=12", "/opt/julia/bin/julia") end
+        assert.are.equal("julia", repl.program(12))
+        assert.are.same({ ["ctx:revise"] = "using Revise" }, repl.sent(12))
+    end)
+
+    it("drops it where the hint named something else", function()
+        kitty.window = function() return { id = 13, title = "julia id=13", foreground_processes = {} } end
+        repl.attach(13, "julia")
+        repl.sent(13)["ctx:revise"] = "using Revise"
+        kitty.window = function() return window("zsh", "/bin/python3", "-i") end
+        assert.are.equal("python", repl.program(13))
+        assert.are.same({}, repl.sent(13))
     end)
 
     it("drops it when a launch takes the window over", function()

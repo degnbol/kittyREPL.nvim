@@ -38,7 +38,9 @@ end
 ---@return boolean
 local function claimed(name)
     for _, programs in pairs(config.programs) do
-        if programs[name] then return true end
+        -- a filetype whose entry the user dropped holds `false`, a deep merge
+        -- having no way to delete one
+        if type(programs) == "table" and programs[name] then return true end
     end
     return false
 end
@@ -95,8 +97,10 @@ local function remember(win, program)
     if not program then return end
     local state = wins[win] or {}
     -- a different program is a different REPL, whatever it has been told before
-    -- and whatever it used to prompt with
-    if state.program ~= program then state.sent, state.prompt = nil, nil end
+    -- and whatever it used to prompt with. A pending hint counts as the name it
+    -- was last claimed to run: code goes out under the hint before anything
+    -- resolves, so a resolution agreeing with it has learned nothing new.
+    if (state.program or state.pending) ~= program then state.sent, state.prompt = nil, nil end
     state.program, state.pending = program, nil
     wins[win] = state
 end
@@ -161,7 +165,8 @@ end
 
 ---Context code a window has already been told, keyed by context key.
 ---Created on first use, and dropped when a launch re-attaches the window or its
----program resolves to a different name, so a REPL that cannot have heard the
+---program resolves to a name other than the one it was last claimed to run --
+---a launch hint being such a claim -- so a REPL that cannot have heard the
 ---code is not assumed to have. A REPL restarted in place under the same name is
 ---indistinguishable without a pid, which the header explains we do not key on,
 ---so it keeps the memo until something else invalidates it.
@@ -186,7 +191,8 @@ end
 
 ---Cache the prompt pattern learned for a window.
 ---Dropped when a launch re-attaches the window or its program resolves to a
----different name, both of which mean a REPL that need not prompt the same way.
+---name other than the one it was last claimed to run, both of which mean a REPL
+---that need not prompt the same way.
 ---@param win integer
 ---@param pattern string
 function M.remember_prompt(win, pattern)
