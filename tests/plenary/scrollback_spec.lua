@@ -37,13 +37,13 @@ describe("prompt detection", function()
     -- a window id per session, so that no test reads another's learned prompt
     local win = 100
 
-    ---Answer kitty with one captured REPL session and read it.
+    ---Answer kitty with one captured REPL session.
     ---@param program string
-    ---@param opts table|nil screen = prompt fixture, else the program's own;
-    ---scrollback = text to serve instead of the captured one;
-    ---alternate = whether a pager holds the screen
+    ---@param opts table|nil screen = fixture path of the screen to serve, else
+    ---the program's own capture; scrollback = text to serve instead of the
+    ---captured one; alternate = whether a pager holds the screen
     ---@return integer win
-    local function session(program, opts)
+    local function serve(program, opts)
         opts = opts or {}
         win = win + 1
         local id = win
@@ -57,10 +57,19 @@ describe("prompt detection", function()
             elseif vim.tbl_contains(argv, "--extent=all") then
                 out = opts.scrollback or fixture("scrollback/" .. program .. ".txt")
             else
-                out = fixture("prompt/" .. (opts.screen or program) .. ".txt")
+                out = fixture(opts.screen or ("prompt/" .. program .. ".txt"))
             end
             return { code = 0, stdout = out, stderr = "" }
         end
+        return id
+    end
+
+    ---Serve one captured REPL session and read the walk off it.
+    ---@param program string
+    ---@param opts table|nil as serve
+    ---@return integer win
+    local function session(program, opts)
+        local id = serve(program, opts)
         scrollback.read(id, program)
         return id
     end
@@ -117,13 +126,13 @@ describe("prompt detection", function()
     end)
 
     it("gives nothing while a computation runs, the cursor having left the prompt", function()
-        session("julia", { screen = "julia-busy" })
+        session("julia", { screen = "prompt/julia-busy.txt" })
         assert.is_nil(scrollback.scroll(1))
         assert.are.same({ "REPL: julia is not at a prompt" }, notified)
     end)
 
     it("refuses a half-typed line, which nothing else on the screen repeats", function()
-        session("radian", { screen = "radian-typing" })
+        session("radian", { screen = "prompt/radian-typing.txt" })
         assert.is_nil(scrollback.scroll(1))
         assert.are.same({ 'REPL: could not confirm radian prompt "R❯ x <- 1 + "' }, notified)
     end)
@@ -148,6 +157,12 @@ describe("prompt detection", function()
         assert.are.same({ "REPL: cannot read a prompt behind a pager" }, notified)
     end)
 
+    it("refuses one that took no alternate screen either, as `less -X` does", function()
+        session("julia", { screen = "../pager/less-top.txt" })
+        assert.is_nil(scrollback.scroll(1))
+        assert.are.same({ "REPL: cannot read a prompt behind a pager" }, notified)
+    end)
+
     it("takes a configured prompt over the running window", function()
         config.prompt.radian = "> "
         session("radian")
@@ -156,6 +171,16 @@ describe("prompt detection", function()
         assert.is_nil(scrollback.scroll(1))
         assert.are.same({}, notified)
         config.prompt.radian = nil
+    end)
+
+    it("re-reads for a buffer bound to another REPL, one walk serving both", function()
+        session("julia")
+        assert.are.same({ { "for i in 1:2" } }, entries(1))
+        -- the walk keys are shared, so a buffer switch is all it takes
+        vim.api.nvim_win_set_buf(0, vim.api.nvim_create_buf(false, true))
+        vim.b.repl_win = serve("lua")
+        scrollback.replaceScroll(1)()
+        assert.are.same({ "print(x)" }, vim.fn.getreg("k", 1, true))
     end)
 
     it("re-learns a prompt that has stopped matching, which is how a mode switch recovers", function()

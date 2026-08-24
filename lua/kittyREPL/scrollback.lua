@@ -9,11 +9,14 @@ local message = require("kittyREPL.message")
 
 -- Module state: one walk backwards through what a REPL has been told, either
 -- read whole out of its history file or cut off the end of `scrollback` an entry
--- at a time as `prompt` finds them.
+-- at a time as `prompt` finds them. One walk rather than one per window: it is a
+-- transient cursor into a REPL's history, and `walkWin` records whose, since two
+-- buffers may be bound to two REPLs and share the keys that walk them.
 local scrollback = ""
 local prompt = nil
 local tScrollback = {}
 local iScrollback = 0
+local walkWin = nil
 
 ---Lua pattern matching a prompt at the start of a line and ending in a position
 ---capture, i.e. the column its command text begins at.
@@ -58,11 +61,14 @@ local function promptFor(win, program, text)
     if cached and promptLines(text, cached) > 0 then return cached end
     local window = kitty.window(win)
     if not window then return end
-    if window.in_alternate_screen then
+    local screen = kitty.get_screen(win)
+    -- the alternate screen additionally refuses a full-screen program that is no
+    -- pager -- an editor, htop -- where is_pager catches a pager that took none,
+    -- as `less -X` does
+    if window.in_alternate_screen or (screen and kitty.is_pager(screen)) then
         message.warn("cannot read a prompt behind a pager")
         return
     end
-    local screen = kitty.get_screen(win)
     local rendered = screen and kitty.prompt_at_cursor(screen)
     if not rendered then
         message.warn(name .. " is not at a prompt")
@@ -86,7 +92,7 @@ end
 ---@param win integer
 ---@param program string|nil program running in the REPL
 function M.read(win, program)
-    tScrollback, iScrollback, scrollback, prompt = {}, 0, "", nil
+    tScrollback, iScrollback, scrollback, prompt, walkWin = {}, 0, "", nil, win
     local reader = config.history[program]
     if reader then tScrollback = history.read(reader, win) end
     if #tScrollback > 0 then return end
@@ -165,8 +171,9 @@ function M.replaceScroll(delta)
     return function()
         local win, program = repl.current()
         if not win then return end
-        -- edge case where replaceScroll is called before startScroll
-        if iScrollback == 0 then M.read(win, program) end
+        -- no walk yet, this being reachable before startScroll, or one read from
+        -- another REPL, the buffer having changed under the key since
+        if iScrollback == 0 or walkWin ~= win then M.read(win, program) end
         local rcmd = M.scroll(delta)
         if rcmd == nil then return end
         vim.fn.setreg("k", rcmd)
