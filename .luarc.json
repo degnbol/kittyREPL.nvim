@@ -1,0 +1,10 @@
+{
+    "runtime": { "version": "LuaJIT" },
+    "workspace": {
+        "library": [
+            "$VIMRUNTIME/lua",
+            "/opt/homebrew/share/nvim/runtime/lua",
+            "/usr/share/nvim/runtime/lua"
+        ]
+    }
+}
