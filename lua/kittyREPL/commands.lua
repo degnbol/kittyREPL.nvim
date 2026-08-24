@@ -8,9 +8,6 @@ local binding = require("kittyREPL.binding")
 local context = require("kittyREPL.context")
 local message = require("kittyREPL.message")
 
-local cmd = vim.cmd
-local fn = vim.fn
-
 ---Quit a pager holding the REPL, so what follows reaches a prompt.
 ---@param win integer
 ---@param screen string|nil the window's screen, read here when not already at hand
@@ -125,14 +122,14 @@ end
 
 ---Manually set REPL as ith visible window from a prompt.
 function M.setI()
-    local i = tonumber(fn.input("Window i: "))
+    local i = tonumber(vim.fn.input("Window i: "))
     if not i then return end
     repl.attach(kitty.get_winid(i))
 end
 
 ---Set REPL window id from user input.
 function M.set()
-    repl.attach(tonumber(fn.input("Window id: ")))
+    repl.attach(tonumber(vim.fn.input("Window id: ")))
 end
 
 ---Set REPL window id to the last active window.
@@ -155,7 +152,7 @@ local function sendLines(send)
     for _ = 1, vim.v.count1 do
         send(win, program, vim.api.nvim_get_current_line())
         if config.progress then
-            cmd 'silent normal! j'
+            vim.cmd 'silent normal! j'
         end
     end
 end
@@ -219,19 +216,19 @@ end
 
 ---Run the visual selection in the REPL.
 function M.runVisual()
-    cmd 'silent normal! "ky'
-    run(fn.getreg('k'))
+    vim.cmd 'silent normal! "ky'
+    run(vim.fn.getreg('k'))
     if config.progress then
-        cmd 'silent normal! `>'
+        vim.cmd 'silent normal! `>'
     end
 end
 
 ---Paste the visual selection to the REPL.
 function M.pasteVisual()
-    cmd 'silent normal! "ky'
-    paste(fn.getreg('k'))
+    vim.cmd 'silent normal! "ky'
+    paste(vim.fn.getreg('k'))
     if config.progress then
-        cmd 'silent normal! `>'
+        vim.cmd 'silent normal! `>'
     end
 end
 
@@ -239,13 +236,13 @@ end
 ---@param type string "char", "line", or "block"
 function M.runOperator(type)
     if type == "char" then
-        cmd 'silent normal! `[v`]"ky'
+        vim.cmd 'silent normal! `[v`]"ky'
     else
-        cmd 'silent normal! `[V`]"ky'
+        vim.cmd 'silent normal! `[V`]"ky'
     end
-    run(fn.getreg('k'))
+    run(vim.fn.getreg('k'))
     if config.progress then
-        cmd 'silent normal! `]w'
+        vim.cmd 'silent normal! `]w'
     end
 end
 
@@ -253,13 +250,13 @@ end
 ---@param type string "char", "line", or "block"
 function M.pasteOperator(type)
     if type == "char" then
-        cmd 'silent normal! `[v`]"ky'
+        vim.cmd 'silent normal! `[v`]"ky'
     else
-        cmd 'silent normal! `[V`]"ky'
+        vim.cmd 'silent normal! `[V`]"ky'
     end
-    paste(fn.getreg('k'))
+    paste(vim.fn.getreg('k'))
     if config.progress then
-        cmd 'silent normal! `]w'
+        vim.cmd 'silent normal! `]w'
     end
 end
 
@@ -284,15 +281,15 @@ end
 
 ---Look up help for the word under the cursor.
 function M.help()
-    runHelp(fn.expand("<cword>"))
+    runHelp(vim.fn.expand("<cword>"))
 end
 
 ---Look up help for the visual selection.
 function M.helpVisual()
-    cmd 'silent normal! "ky'
-    runHelp(fn.getreg('k'))
+    vim.cmd 'silent normal! "ky'
+    runHelp(vim.fn.getreg('k'))
     if config.progress then
-        cmd 'silent normal! `>'
+        vim.cmd 'silent normal! `>'
     end
 end
 
