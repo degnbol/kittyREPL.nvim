@@ -8,6 +8,7 @@
 local M = {}
 
 local message = require("kittyREPL.message")
+local util = require("kittyREPL.util")
 
 ---Whether a line ends with an odd number of backslashes, i.e. a continuation.
 ---Even trailing backslashes are escaped literals, not continuations.
@@ -164,10 +165,7 @@ end
 ---@param path string
 ---@return string|nil nil without the sqlite3 binary, leaving recall to the screen
 local function read_sqlite(path)
-    -- required here rather than at the top, config requiring this module and
-    -- kitty requiring config
-    local kitty = require("kittyREPL.kitty")
-    local ok, out = pcall(kitty._exec, { "sqlite3", "-json", path,
+    local ok, out = pcall(util.exec, { "sqlite3", "-json", path,
         "select source_raw from history order by rowid desc limit " .. LIMIT })
     if not ok then
         message.warn_once(tostring(out))

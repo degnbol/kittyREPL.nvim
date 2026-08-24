@@ -3,6 +3,7 @@
 -- are asserted rather than eyeballed in a terminal.
 local kitty = require("kittyREPL.kitty")
 local config = require("kittyREPL.config")
+local util = require("kittyREPL.util")
 
 local WIN = 7
 
@@ -11,7 +12,7 @@ local calls
 ---Capture every subprocess instead of running it.
 local function record()
     calls = {}
-    kitty._exec = function(argv, stdin)
+    util.exec = function(argv, stdin)
         table.insert(calls, { argv = argv, stdin = stdin })
         return { code = 0, stdout = "", stderr = "" }
     end
@@ -137,7 +138,7 @@ describe("kitty.launch", function()
     before_each(record)
 
     it("word-splits a user-authored command into argv, no shell involved", function()
-        kitty._exec = function(argv)
+        util.exec = function(argv)
             table.insert(calls, { argv = argv })
             return { code = 0, stdout = "9\n", stderr = "" }
         end
@@ -153,16 +154,16 @@ end)
 describe("kitty command failure", function()
     local notified, notify, exec
     before_each(function()
-        notified, notify, exec = nil, vim.notify, kitty._exec
+        notified, notify, exec = nil, vim.notify, util.exec
         -- notify_once routes through notify, so this catches the first of each message
         vim.notify = function(msg) notified = msg end
     end)
     after_each(function()
-        vim.notify, kitty._exec = notify, exec
+        vim.notify, util.exec = notify, exec
     end)
 
     it("reports an unusable remote control rather than hiding stderr", function()
-        kitty._exec = function()
+        util.exec = function()
             return { code = 1, stdout = "", stderr = "Error: No listening socket\n" }
         end
         assert.is_nil(kitty.get_scrollback(WIN))
@@ -170,13 +171,13 @@ describe("kitty command failure", function()
     end)
 
     it("reports a kitty binary it cannot spawn, where vim.system raises", function()
-        kitty._exec = function() error("ENOENT: no such file or directory (cmd): 'kitty'") end
+        util.exec = function() error("ENOENT: no such file or directory (cmd): 'kitty'") end
         assert.is_nil(kitty.get_scrollback(WIN))
         assert.is_truthy(notified:find("ENOENT", 1, true))
     end)
 
     it("stays quiet for a window that is gone, since that is the existence check", function()
-        kitty._exec = function()
+        util.exec = function()
             return { code = 1, stdout = "", stderr = "Error: No matching windows for expression: id:7\n" }
         end
         assert.is_nil(kitty.window(WIN))

@@ -2,9 +2,9 @@
 -- Screens, scrollbacks and history files as a live kitty returned them, captured
 -- by tests/fixtures/repl.sh.
 local scrollback = require("kittyREPL.scrollback")
-local kitty = require("kittyREPL.kitty")
 local config = require("kittyREPL.config")
 local history = require("kittyREPL.history")
+local util = require("kittyREPL.util")
 
 local FIXTURES = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)) .. "/../fixtures/repl/"
 
@@ -23,7 +23,7 @@ end
 describe("prompt detection", function()
     local exec, notify, histories, notified
     before_each(function()
-        exec, notify = kitty._exec, vim.notify
+        exec, notify = util.exec, vim.notify
         -- every program reads off the screen here, history recall being below
         histories, config.history = config.history, {}
         notified = {}
@@ -31,7 +31,7 @@ describe("prompt detection", function()
         vim.notify = function(msg) table.insert(notified, msg) end
     end)
     after_each(function()
-        kitty._exec, vim.notify, config.history = exec, notify, histories
+        util.exec, vim.notify, config.history = exec, notify, histories
     end)
 
     -- a window id per session, so that no test reads another's learned prompt
@@ -48,7 +48,7 @@ describe("prompt detection", function()
         win = win + 1
         local id = win
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function(argv)
+        util.exec = function(argv)
             local out
             if argv[3] == "ls" then
                 out = vim.json.encode({ { tabs = { { windows = { {
@@ -162,7 +162,7 @@ describe("prompt detection", function()
         local id = session("julia")
         assert.are.same({ { "for i in 1:2" } }, entries(1))
         -- the same window, now showing a REPL that prompts differently
-        kitty._exec = function(argv)
+        util.exec = function(argv)
             if argv[3] == "ls" then
                 return { code = 0, stderr = "",
                     stdout = vim.json.encode({ { tabs = { { windows = { { id = id } } } } } }) }
@@ -177,8 +177,8 @@ end)
 
 describe("history recall", function()
     local exec, shipped
-    before_each(function() exec, shipped = kitty._exec, vim.deepcopy(config.history) end)
-    after_each(function() kitty._exec, config.history = exec, shipped end)
+    before_each(function() exec, shipped = util.exec, vim.deepcopy(config.history) end)
+    after_each(function() util.exec, config.history = exec, shipped end)
 
     ---Read a program's history from a fixed file rather than wherever it lives.
     ---@param program string
@@ -189,7 +189,7 @@ describe("history recall", function()
             parse = config.history[program].parse,
         }
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function() error("the screen must not be read") end
+        util.exec = function() error("the screen must not be read") end
     end
 
     it("reads a shell's history file rather than its screen", function()
@@ -215,7 +215,7 @@ describe("history recall", function()
         config.history.zsh = { path = function() error("nowhere") end, parse = config.history.zsh.parse }
         -- a blank screen, so what follows the fault is the ordinary fallback
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function(argv)
+        util.exec = function(argv)
             local ls = vim.json.encode({ { tabs = { { windows = { { id = 7 } } } } } })
             return { code = 0, stdout = argv[3] == "ls" and ls or "", stderr = "" }
         end

@@ -6,16 +6,7 @@ local M = {}
 
 local config = require("kittyREPL.config")
 local message = require("kittyREPL.message")
-
----Run a command to completion.
----Swapped out in tests to exercise the send path without kitty.
----@param argv string[]
----@param stdin string|nil written to the child's stdin, which is then closed
----@return vim.SystemCompleted
-function M._exec(argv, stdin)
-    -- no text=true: get-text output is passed through byte for byte
-    return vim.system(argv, { stdin = stdin }):wait()
-end
+local util = require("kittyREPL.util")
 
 ---Run a `kitty @` command.
 ---@param argv string[] arguments following `kitty @`
@@ -26,7 +17,7 @@ end
 local function kitty_cmd(argv, stdin, no_match_ok)
     -- vim.system raises rather than returns when it cannot spawn at all, which
     -- is every mapped key on a machine without the kitty CLI
-    local ok, out = pcall(M._exec, vim.list_extend({ "kitty", "@" }, argv), stdin)
+    local ok, out = pcall(util.exec, vim.list_extend({ "kitty", "@" }, argv), stdin)
     if not ok then
         message.warn_once(tostring(out))
         return

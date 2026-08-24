@@ -2,7 +2,7 @@
 
 **Goal:** derive each REPL's prompt from the running window instead of a shipped
 guess, and take multi-line recall from the REPL's own history file.
-**Depends on:** 04 (per-window state), 05 (`_exec`, explicit `win`,
+**Depends on:** 04 (per-window state), 05 (`util.exec`, explicit `win`,
 `kitty.window(win)`).
 **Blocks:** nothing. 09 wants it — its settle poll (`09-context-sync.md:132`)
 reads the learned prompt instead of `config.match.prompt`.
@@ -169,7 +169,7 @@ No kitty needed for any of this — `design.md` § Testing.
 - `parseScrollback` against captured `--extent=all` samples for python, r, lua,
   ipython and radian, asserting the entry lists.
 - julia and radian history parsers from text fixtures; ipython from a fixture
-  database or a stubbed `_exec`.
+  database or a stubbed `util.exec`.
 
 ## Verify
 

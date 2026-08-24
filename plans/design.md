@@ -17,7 +17,7 @@ The buffer→window binding *is* per-buffer — two files may target two REPLs �
 ### Registry: `lua/kittyREPL/repl.lua`
 
 ```lua
-local wins = {}   -- [win] = { program = "radian", pending = "radian"|nil, sent = {} }
+local wins = {}   -- [win] = { program, pending, sent = {}, prompt = "^>>> ()" }
 
 M.attach(win, hint)  -- bind buffer -> win, cache identity, returns win|nil
 M.resolve(window)    -- `kitty @ ls` record -> program name|nil. Pure; the tested unit
@@ -25,6 +25,8 @@ M.revalidate()       -- binding still usable? refreshes identity from the same r
 M.program(win)       -- cached program name, resolving lazily on first use
 M.win()              -- -> win|nil
 M.current()          -- -> win|nil, program|nil
+M.sent(win)          -- context memo, created on first use
+M.prompt(win) / M.remember_prompt(win, pattern)
 ```
 
 `attach` returns the window rather than the program name, since a bound window
@@ -46,7 +48,7 @@ module-level table keyed the same way.
 
 **Launch race.** `kitty @ launch` returns before the program appears in
 `foreground_processes`, so identity cannot be resolved at launch. Pass the launch
-word as `hint`, store as `pending`, and let `repl.cmd(win)` re-resolve from
+word as `hint`, store as `pending`, and let `repl.program(win)` re-resolve from
 `kitty @ ls --match id:` on first use and promote the result — keeping the hint
 only if detection returns nil.
 
@@ -70,7 +72,7 @@ in a `config.lua` header comment.
 - **filetype-keyed** — chosen from the file being edited: `exclude`, `command`,
   `command_count`, `programs`, `iterate`
 - **program-keyed** — chosen from what is running: `bracketed`, `linewise`,
-  `custom`, `match.prompt`, `match.help`, `context`, `variables`, `assign`
+  `custom`, `prompt`, `history`, `match.help`, `context`, `variables`, `assign`
 
 ## Transport
 
@@ -79,25 +81,20 @@ Every `kitty.lua` function takes an explicit window id (`kitty.send_raw(win, tex
 This is the precondition for testing the send path and for context sync targeting a
 specific window.
 
-All subprocess use funnels through one private helper on `vim.system`:
+All subprocess use funnels through one helper on `vim.system`, in `util.lua`
+because `history.lua` runs `sqlite3` through it too:
 
 ```lua
-M._exec = function(argv, stdin)  -- returns { code, stdout, stderr }
+util.exec = function(argv, stdin)  -- returns { code, stdout, stderr }
 ```
 
 argv tables, no shell, no string concatenation into a command line, real exit
-codes, and stderr no longer discarded by `2>/dev/null` (`kitty.lua:14`). `M._exec`
-is the swap point for tests.
+codes, and stderr no longer discarded by `2>/dev/null`. `util.exec` is the swap
+point for tests.
 
 `kitty.launch` still needs word splitting, because `config.command` values are
 user-authored strings — use `vim.split` on whitespace rather than handing them to
 `sh`.
-
-**`os.execute` semantics.** Under nvim 0.12.4's LuaJIT these are Lua 5.1:
-`os.execute("true")` is `0`, `os.execute("false")` is `256`. The `== 0` checks in
-`kitty.exists` and `kitty.interrupt` are correct today and must become
-`:wait().code` in the port — keeping `== 0` against a `vim.SystemCompleted` makes
-`kitty.exists` always false.
 
 **Do not add a `send.lua`.** `kitty.send`'s dispatch across
 `custom`/`bracketed`/`linewise` is knowledge about how each program consumes text
@@ -106,14 +103,17 @@ in — the `run`/`paste` wrappers in `commands.lua` are its home.
 
 ## Testing
 
-**No kitty and no seam needed:** `repl.resolve`;
-`parseHistoryText`; `parseScrollback` once it takes text as a parameter instead of
-reading a module global; `readHistory` after task 01; `is_pager` after task 06;
-`replHelpCmd`'s dispatch given injected scrollback text.
+**No kitty and no seam needed:** `repl.resolve`, the `history.lua` parsers,
+`history.read`, `kitty.is_pager`.
 
 **Seam needed:** `kitty.send` dispatch, `repl.attach`, `replCheck`.
 
-Introduce the `_exec` seam (task 05); do not build a fake kitty. A fixture-driven
+**Still reads its own input, so neither:** `parseScrollback` takes the scrollback
+off a module global (`scrollback.lua:102`), and `replHelpCmd` fetches its own
+(`commands.lua:77`) rather than being handed text. Both were meant to be
+parameterised and were not; testing their dispatch means doing that first.
+
+Introduce the `exec` seam (task 05); do not build a fake kitty. A fixture-driven
 fake `kitty @` that models window lifecycle and focus history is more code than
 the module it tests, encodes JSON assumptions only a live kitty can validate, and
 loses most of its value once identity resolution moves into `repl.lua`. Test the

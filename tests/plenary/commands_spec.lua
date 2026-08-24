@@ -3,6 +3,7 @@
 local commands = require("kittyREPL.commands")
 local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
+local util = require("kittyREPL.util")
 
 local sent, notified
 
@@ -12,7 +13,7 @@ local function record()
     kitty.run = function(_, _, text) sent = text end
     kitty.window = function() return { id = 7, foreground_processes = {} } end
     -- nothing here may reach the developer's terminal, whichever config defaults change
-    kitty._exec = function() return { code = 0, stdout = "", stderr = "" } end
+    util.exec = function() return { code = 0, stdout = "", stderr = "" } end
     vim.notify = function(msg) notified = msg end
 end
 

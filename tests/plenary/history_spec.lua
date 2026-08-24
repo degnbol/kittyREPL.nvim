@@ -4,7 +4,7 @@
 -- that wire them up, those being what a program name actually resolves to.
 local history = require("kittyREPL.history")
 local config = require("kittyREPL.config")
-local kitty = require("kittyREPL.kitty")
+local util = require("kittyREPL.util")
 local parse = history.parse_shell
 
 ---One captured history file.
@@ -179,17 +179,17 @@ end)
 describe("ipython database", function()
     local exec, notify, notified
     before_each(function()
-        exec, notify = kitty._exec, vim.notify
+        exec, notify = util.exec, vim.notify
         notified = {}
         ---@diagnostic disable-next-line: duplicate-set-field
         vim.notify = function(msg) table.insert(notified, msg) end
     end)
-    after_each(function() kitty._exec, vim.notify = exec, notify end)
+    after_each(function() util.exec, vim.notify = exec, notify end)
 
     it("queries the profile's database and parses what comes back", function()
         local argv
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function(a)
+        util.exec = function(a)
             argv = a
             return { code = 0, stdout = fixture("ipython.json"), stderr = "" }
         end
@@ -201,14 +201,14 @@ describe("ipython database", function()
 
     it("leaves recall to the screen when sqlite3 fails, saying why once", function()
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function() return { code = 1, stdout = "", stderr = "unable to open database" } end
+        util.exec = function() return { code = 1, stdout = "", stderr = "unable to open database" } end
         assert.are.same({}, history.read(config.history.ipython, 7))
         assert.are.same({ "REPL: unable to open database" }, notified)
     end)
 
     it("leaves recall to the screen when there is no sqlite3 to run", function()
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function() error("ENOENT: no such file or directory") end
+        util.exec = function() error("ENOENT: no such file or directory") end
         assert.are.same({}, history.read(config.history.ipython, 7))
         assert.are.equal(1, #notified)
     end)
@@ -216,14 +216,14 @@ end)
 
 describe("radian history path", function()
     local exec
-    before_each(function() exec = kitty._exec end)
-    after_each(function() kitty._exec = exec end)
+    before_each(function() exec = util.exec end)
+    after_each(function() util.exec = exec end)
 
     ---Answer `kitty @ ls` with a window sitting in a directory.
     ---@param cwd string
     local function sitting_in(cwd)
         ---@diagnostic disable-next-line: duplicate-set-field
-        kitty._exec = function()
+        util.exec = function()
             return { code = 0, stderr = "",
                 stdout = vim.json.encode({ { tabs = { { windows = { { id = 7, cwd = cwd } } } } } }) }
         end

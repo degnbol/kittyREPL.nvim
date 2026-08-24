@@ -47,7 +47,7 @@ Keep the heuristic regardless — it also covers the `(END)` case.
 
 - `make test` passes, including the new `is_pager` spec
 - julia `@help` on a long docstring: the pager opens, and the next send closes it
-- Count the `kitty @` calls for one `<CR>` (log `_exec` argv) — one action should
+- Count the `kitty @` calls for one `<CR>` (log `util.exec` argv) — one action should
   probe once
 
 ## Out of scope

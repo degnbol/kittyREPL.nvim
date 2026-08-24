@@ -15,7 +15,7 @@ that read `vim.b.repl_win`. Callers hold the id already: task 04 put the
 **One subprocess helper** on `vim.system`:
 
 ```lua
-M._exec = function(argv, stdin)  -- returns { code, stdout, stderr }
+util.exec = function(argv, stdin)  -- returns { code, stdout, stderr }
 ```
 
 Route all 11 `io.popen`/`os.execute` calls through it. argv tables, no shell, no
@@ -43,7 +43,7 @@ trip, not by speed.
 
 ## Test
 
-Add `tests/plenary/send_spec.lua` with a fake `_exec`, asserting:
+Add `tests/plenary/send_spec.lua` with a fake `util.exec`, asserting:
 
 - dispatch precedence: `custom` > `bracketed` > `linewise` > raw
 - the exact bracketed byte sequence, including the `\x1b[200~` / `\x1b[201~`
