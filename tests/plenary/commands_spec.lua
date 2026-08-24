@@ -5,9 +5,23 @@ local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local util = require("kittyREPL.util")
 
+local FIXTURES = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2)) .. "/../fixtures/"
+
+---One screen captured by tests/fixtures/repl.sh or pager.sh, read byte for byte:
+---the cursor escape it ends in is what a prompt and a pager are measured against.
+---@param name string path under tests/fixtures
+---@return string
+local function fixture(name)
+    local file = assert(io.open(FIXTURES .. name, "rb"))
+    local text = file:read("*a")
+    file:close()
+    return text
+end
+
 local sent, notified
 
 ---Capture what the commands send and notify instead of doing it.
+---Every stub is put back by restoring(), so no test inherits one.
 local function record()
     sent, notified = nil, nil
     kitty.run = function(_, _, text) sent = text end
@@ -15,6 +29,23 @@ local function record()
     -- nothing here may reach the developer's terminal, whichever config defaults change
     util.exec = function() return { code = 0, stdout = "", stderr = "" } end
     vim.notify = function(msg) notified = msg end
+end
+
+---Put back whatever record() overwrites, for the tests of one describe block.
+---Called per block rather than once for the file: plenary registers a
+---before_each against the block being described.
+local function restoring()
+    local stubbed
+    before_each(function()
+        stubbed = {
+            run = kitty.run, window = kitty.window, screen = kitty.get_screen,
+            send_raw = kitty.send_raw, exec = util.exec, notify = vim.notify,
+        }
+    end)
+    after_each(function()
+        kitty.run, kitty.window, kitty.get_screen = stubbed.run, stubbed.window, stubbed.screen
+        kitty.send_raw, util.exec, vim.notify = stubbed.send_raw, stubbed.exec, stubbed.notify
+    end)
 end
 
 ---@param ft string
@@ -30,18 +61,127 @@ local function open(ft, lines, cursor)
     vim.b.repl_win = 7
 end
 
+describe("commands.help", function()
+    restoring()
+
+    ---Bind the buffer to a window running one program and showing one screen.
+    ---@param win integer an id of its own per case, identity being cached per window
+    ---@param command string what the window's foreground process runs
+    ---@param shown string|nil the screen it is sitting at
+    local function at(win, command, shown)
+        open("python", { "print" }, { 1, 0 })
+        vim.b.repl_win = win
+        kitty.window = function()
+            return { id = win, foreground_processes = { { cmdline = { command } } } }
+        end
+        kitty.get_screen = function() return shown end
+    end
+
+    it("prefixes the query where help is one command", function()
+        at(20, "/usr/bin/R")
+        commands.help()
+        assert.are.equal("?print", sent)
+    end)
+
+    it("wraps the query where help is a call", function()
+        at(21, "/usr/bin/python3")
+        commands.help()
+        assert.are.equal("help(print)", sent)
+    end)
+
+    it("picks julia's help command by the mode it is prompting in", function()
+        at(22, "/opt/julia/bin/julia", fixture("repl/prompt/julia-pager.txt"))
+        commands.help()
+        assert.are.equal("?print", sent)
+    end)
+
+    it("sends the query bare where the REPL is already in help mode", function()
+        at(23, "/opt/julia/bin/julia", fixture("repl/prompt/julia-help.txt"))
+        commands.help()
+        assert.are.equal("print", sent)
+    end)
+
+    it("falls back to the default at a primary prompt, whatever it renders as", function()
+        -- the shipped patterns describe julia's own modes; this prompt is the
+        -- user's configuration of it and holds none of them
+        at(24, "/opt/julia/bin/julia", fixture("repl/prompt/julia.txt"))
+        commands.help()
+        assert.are.equal("@help print", sent)
+    end)
+
+    it("warns and sends nothing for a program with no help command", function()
+        at(25, "/bin/zsh")
+        commands.help()
+        assert.is_nil(sent)
+        assert.are.equal("REPL: no help command for zsh", notified)
+    end)
+
+    it("takes an entry the user dropped with false as no entry", function()
+        local shipped = config.help.r
+        config.help.r = false
+        at(27, "/usr/bin/R")
+        commands.help()
+        config.help.r = shipped
+        assert.is_nil(sent)
+        assert.are.equal("REPL: no help command for r", notified)
+    end)
+
+    it("reads one screen, for the prompt and the pager both, before sending", function()
+        local closepager = config.closepager
+        config.closepager = true
+        at(28, "/usr/bin/python3", fixture("pager/terminalpager-mid.txt"))
+        local order, reads = {}, 0
+        kitty.get_screen = function()
+            reads = reads + 1
+            return fixture("pager/terminalpager-mid.txt")
+        end
+        kitty.send_raw = function(_, text) table.insert(order, "send:" .. text) end
+        kitty.run = function(_, _, text) table.insert(order, "run:" .. text) end
+        commands.help()
+        config.closepager = closepager
+        -- quitting the pager is what changes the screen the prompt was read off,
+        -- so reading twice would mean reading it after the change
+        assert.are.equal(1, reads)
+        assert.are.same({ "send:q", "run:help(print)" }, order)
+    end)
+
+    it("does not read a pager's own footer as the prompt to match modes on", function()
+        local shipped = config.help.julia
+        -- a pattern the pager's footer would match, where no shipped one does
+        config.help.julia = { modes = { { ":", "?" } } }
+        -- less at its colon prompt, which reads as a prompt where a page part
+        -- way through does not: its footer is the only thing on the last line
+        at(29, "/opt/julia/bin/julia", fixture("pager/less-top.txt"))
+        commands.help()
+        config.help.julia = shipped
+        assert.is_nil(sent)
+        assert.is_truthy(notified:match("^REPL: no help command for julia"))
+    end)
+
+    it("looks up the selection rather than the word under the cursor", function()
+        at(26, "/usr/bin/python3")
+        vim.api.nvim_buf_set_lines(0, 0, -1, false, { "os.path" })
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.api.nvim_feedkeys(vim.keycode("v$h"), "mx", false)
+        commands.helpVisual()
+        assert.are.equal("help(os.path)", sent)
+    end)
+end)
+
 describe("commands pager probe", function()
-    local probes, raw, detect_pager, send_raw, closepager
+    restoring()
+    local probes, raw, closepager
     before_each(function()
         probes, raw = 0, {}
-        detect_pager, send_raw, closepager = kitty.detect_pager, kitty.send_raw, config.closepager
-        config.closepager = true
-        kitty.detect_pager = function() probes = probes + 1; return true end
+        closepager, config.closepager = config.closepager, true
+        -- a probe is one screen read, of a screen a pager is holding
+        kitty.get_screen = function()
+            probes = probes + 1
+            return fixture("pager/terminalpager-mid.txt")
+        end
         kitty.send_raw = function(_, text) table.insert(raw, text) end
     end)
-    after_each(function()
-        kitty.detect_pager, kitty.send_raw, config.closepager = detect_pager, send_raw, closepager
-    end)
+    after_each(function() config.closepager = closepager end)
 
     it("probes once per action, where sending probed once per send", function()
         open("python", { "1 + 1" }, { 1, 0 })
@@ -75,6 +215,7 @@ describe("commands pager probe", function()
 end)
 
 describe("commands context sync", function()
+    restoring()
     local hooks, paste
     before_each(function()
         hooks, paste = config.context.python, kitty.paste
@@ -128,6 +269,7 @@ describe("commands context sync", function()
 end)
 
 describe("commands.runLineFor", function()
+    restoring()
     it("sends the first element of the iterable, iterator or not", function()
         open("python", { "for scene, _arrows in zip(scenes, arrows, strict=True):", "    pass" }, { 1, 0 })
         commands.runLineFor()
@@ -157,6 +299,7 @@ describe("commands.runLineFor", function()
 end)
 
 describe("commands.runLineForI", function()
+    restoring()
     it("indexes the iterable at the language's first index", function()
         open("python", { "for i in items:", "    pass" }, { 1, 0 })
         commands.runLineForI()
@@ -170,6 +313,7 @@ describe("commands.runLineForI", function()
 end)
 
 describe("commands.iterateExpr", function()
+    restoring()
     it("wraps python iterables so iterators work too", function()
         record()
         assert.are.equal("next(iter(zip(a, b)))",

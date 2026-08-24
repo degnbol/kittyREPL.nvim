@@ -6,7 +6,7 @@
 --   exclude, command, command_count, iterate, programs
 -- * program, i.e. what runs in the REPL window:
 --   bracketed, linewise, custom, context, variables, assign, prompt, history,
---   match.help
+--   help
 -- programs bridges the two: it is keyed by filetype and its values are program
 -- names. A program name and a filetype coincide for some languages (julia, lua)
 -- and differ for others (an r buffer drives radian).
@@ -172,22 +172,32 @@ local M = {
     -- Program-keyed history file readers, for the REPLs that write one as they
     -- go. See history.lua for the shape of an entry and the shipped defaults.
     history = history.readers,
-    -- language specific matching
-    match = {
-        -- Program-keyed help command, often a "?" prefix.
-        -- For each program provide either a help command prefix string, a two element array with prefix and suffix,
-        -- or a key-value table where each key will be matched against the last prompt (from first to last key).
-        -- E.g. julia uses ? for builtin help, but with TerminalPager @help is better for long help pages.
-        help = {
-            -- TODO: this shouldn't be default as it assumes TerminalPager is installed.
-            julia = { ["pager??>"] = "", ["pager>"] = "?", ["help??>"] = "", [">"] = "@help " },
-            radian = "?",
-            r = "?",
-            ipython = "?",
-            python = { "help(", ")" },
-            pymol = "help ", -- "?" is a syntax error in pymol
-            lua = "", -- no help available
+    -- Program-keyed help command, often a "?" prefix.
+    -- For each program provide either a help command prefix string, a two
+    -- element array with prefix and suffix, or, where the command depends on the
+    -- mode the REPL is in, `modes` of { prompt pattern, command } matched in
+    -- order against the prompt it is sitting at, with `default` for a prompt
+    -- none of them match. Patterns are Lua patterns, so a literal "?" needs
+    -- escaping. `modes` is a list, so a user's own replaces this one whole
+    -- rather than being merged into it entry by entry.
+    help = {
+        -- julia's mode prompts are drawn by julia and TerminalPager, where the
+        -- primary prompt is the user's own configuration and so is left to
+        -- `default`. @help pages long help, which presumes TerminalPager.
+        julia = {
+            default = "@help ",
+            modes = {
+                { "pager%?>", "" },
+                { "pager>",   "?" },
+                { "help%?>",  "" },
+            },
         },
+        radian = "?",
+        r = "?",
+        ipython = "?",
+        python = { "help(", ")" },
+        pymol = "help ", -- "?" is a syntax error in pymol
+        lua = "", -- no help available
     },
 }
 

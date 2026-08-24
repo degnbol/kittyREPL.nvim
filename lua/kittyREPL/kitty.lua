@@ -110,16 +110,6 @@ function M.send_bracketed(win, text, post)
     M.send_raw(win, "\x1b[200~" .. text .. "\x1b[201~" .. post)
 end
 
----Fixes indentation by prepending Start Of Header signal.
----This can be a fallback method if a REPL doesn't support bracketed paste,
----however each line will then be sent and called separately, which may be a
----problem if there are empty lines within the sent block.
----@param text string
----@return string
-function M.SOH(text)
-    return (text:gsub('\n', '\n\x01'))
-end
-
 ---Send text to the REPL with appropriate method based on config.
 ---An unresolved program falls through to a raw send, the conservative default.
 ---@param win integer
@@ -243,15 +233,6 @@ end
 ---@return string?
 function M.get_screen(win)
     return get_text(win, "--extent=screen", "--add-cursor")
-end
-
----Whether the REPL is currently displaying a pager (e.g. help texts).
----One `kitty @ get-text` round trip, so this belongs per user action, not per send.
----@param win integer
----@return boolean
-function M.detect_pager(win)
-    local screen = M.get_screen(win)
-    return screen ~= nil and M.is_pager(screen)
 end
 
 ---Get scrollback text from the REPL.

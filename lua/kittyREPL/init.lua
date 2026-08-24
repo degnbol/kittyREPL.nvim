@@ -10,6 +10,7 @@ local history = require("kittyREPL.history")
 local commands = require("kittyREPL.commands")
 local context = require("kittyREPL.context")
 local util = require("kittyREPL.util")
+local message = require("kittyREPL.message")
 
 -- Re-export submodules for advanced usage
 M.kitty = kitty
@@ -44,6 +45,8 @@ end
 ---@param userconfig table?
 function M.setup(userconfig)
     if userconfig ~= nil then
+        -- a key nothing reads would otherwise be merged in and ignored silently
+        if userconfig.match then message.warn("config.match.help is now config.help") end
         -- Merge user config into default config
         for k, v in pairs(userconfig) do
             if type(v) == "table" and type(config[k]) == "table" then

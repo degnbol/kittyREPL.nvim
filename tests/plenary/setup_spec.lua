@@ -24,6 +24,15 @@ describe("setup", function()
         assert.are.equal(defaults.custom.lua, config.custom.lua)
     end)
 
+    it("warns about a help command under the key it used to live at", function()
+        local notify, notified = vim.notify, nil
+        ---@diagnostic disable-next-line: duplicate-set-field
+        vim.notify = function(msg) notified = msg end
+        require("kittyREPL").setup({ match = { help = { julia = "?" } } })
+        vim.notify = notify
+        assert.are.equal("REPL: config.match.help is now config.help", notified)
+    end)
+
     it("leaves a prompt override bare, however often it runs", function()
         require("kittyREPL").setup({ prompt = { mine = "mine> " } })
         require("kittyREPL").setup()

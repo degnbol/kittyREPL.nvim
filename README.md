@@ -65,7 +65,7 @@ silently ignored.
 
 | keyed by filetype — the file you edit | keyed by program — what runs in the REPL window |
 |---|---|
-| `exclude`, `command`, `command_count`, `iterate` | `bracketed`, `linewise`, `custom`, `context`, `variables`, `assign`, `prompt`, `history`, `match.help` |
+| `exclude`, `command`, `command_count`, `iterate` | `bracketed`, `linewise`, `custom`, `context`, `variables`, `assign`, `prompt`, `history`, `help` |
 
 `programs` bridges the two: it is keyed by filetype and its values are program
 names. A name and a filetype coincide for some languages (`julia`, `lua`) and
@@ -124,12 +124,26 @@ differ for others — an `r` buffer usually drives `radian`.
   to the file's last 500 lines — and `parse(text)` cuts it into entries, most
   recent first, each a list of lines. Shipped for the three shells, julia, radian
   and ipython, in `lua/kittyREPL/history.lua`.
-- **`match.help`** — the program's help command: a prefix string (`r = "?"`), a
-  `{ prefix, suffix }` pair (`python = { "help(", ")" }`), or a table mapping a
-  prompt pattern to either of those. A table is resolved against the scrollback,
-  walking back from the last line until one of the patterns matches, which is how
-  the julia default picks between `?` and TerminalPager's `@help` according to the
-  prompt the REPL is sitting at. That default presumes TerminalPager is installed.
+- **`help`** — the program's help command: a prefix string (`r = "?"`), a
+  `{ prefix, suffix }` pair (`python = { "help(", ")" }`), or, where it depends on
+  the mode the REPL is in, `modes` of `{ pattern, command }` with a `default`:
+
+  ```lua
+  julia = {
+      default = "@help ",
+      modes = { { "pager%?>", "" }, { "pager>", "?" }, { "help%?>", "" } },
+  }
+  ```
+
+  The patterns are Lua patterns — hence the escaped `?` — matched in order
+  against the prompt the REPL is sitting at, first match winning. `modes` is a
+  list, so your own replaces the shipped one whole rather than merging into it.
+  `default` covers the prompt none of them describe, which is the primary one:
+  that is the user's own configuration, where the mode prompts are drawn by julia
+  and TerminalPager. A pager holding the screen draws a footer rather than a
+  prompt, which is no mode either, so `default` answers there too. The julia
+  entry presumes TerminalPager is installed. A program with no entry has no help
+  command, and the help maps say so rather than guessing one.
 
 Send-path precedence: `custom`, then `bracketed`, then `linewise`, then raw.
 
@@ -155,7 +169,8 @@ to reach that window.
 `variables` are sent before `context` hooks, each in key order. The memo is per
 kitty window, not per buffer — one REPL serves many buffers, which is what makes
 `__file__` go stale in the first place. It is dropped when a launch re-attaches
-the window or the window's program resolves to a different name. A REPL restarted
+the window or the window's program resolves to a name other than the one it was
+last claimed to run, a launch hint counting as such a claim. A REPL restarted
 in place under the same name is indistinguishable and keeps the memo. A line that
 errors in the REPL still counts as delivered, so a hook the REPL cannot run fails
 once rather than on every send.
@@ -226,7 +241,7 @@ continuation prompt not being measurable this way.
 1. Add the filetype to `programs`, mapping it to the program names its REPL may
    run.
 2. Give it a `command` if a new REPL window should not just be a shell.
-3. Add `match.help` under the program names, for the help map. Recall needs
+3. Add `help` under the program names. Recall needs
    nothing, unless the REPL keeps a history file worth a `history` entry.
 4. Set `bracketed`, `linewise` or `custom` under the program name if a plain
    multi-line send does not work.

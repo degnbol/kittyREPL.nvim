@@ -1,7 +1,8 @@
 #!/usr/bin/env zsh
 # Screens, scrollbacks and history files as a live REPL leaves them, for the
 # prompt-learning and recall specs. Needs a running kitty with remote control
-# enabled and python3, ipython, radian, R, lua, julia, pymol and sqlite3 on PATH.
+# enabled and python3, ipython, radian, R, lua, julia, pymol and sqlite3 on PATH,
+# plus TerminalPager installed for julia's pager modes.
 # Each REPL's history is redirected into a scratch directory, so running this
 # does not touch the caller's own history files.
 set -euo pipefail
@@ -138,6 +139,28 @@ send $'\x03'
 waitfor '❯'
 close
 cp $scratch/repl_history.jl repl/history/repl_history.jl
+
+# julia's own mode prompts, which the help command is chosen by. Unlike the
+# primary prompt above, these are drawn by julia and TerminalPager rather than
+# configured, so a shipped pattern can match them. A window of its own with a
+# history file of its own: loading the package is typed at the prompt, so in the
+# window above it would land in the history captured from it.
+win=$(launch --env=JULIA_HISTORY=$scratch/modes.jl julia --banner=no)
+waitfor '❯'
+send 'using TerminalPager; println("loaded")
+'
+waitfor '^loaded$'
+send '?'
+waitfor '^help\?>$'
+screen julia-help
+send $'\x7f'
+send '|'
+waitfor '^pager>$'
+screen julia-pager
+send '?'
+waitfor '^pager\?>$'
+screen julia-pager-help
+close
 
 # pymol prints no prompt, so its readiness has to be asked for.
 # -c leaves out the OpenGL window that -x keeps (-x drops only the control

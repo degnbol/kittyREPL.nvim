@@ -13,8 +13,11 @@ local fn = vim.fn
 
 ---Quit a pager holding the REPL, so what follows reaches a prompt.
 ---@param win integer
-local function closePager(win)
-    if config.closepager and kitty.detect_pager(win) then
+---@param screen string|nil the window's screen, read here when not already at hand
+local function closePager(win, screen)
+    if not config.closepager then return end
+    screen = screen or kitty.get_screen(win)
+    if screen and kitty.is_pager(screen) then
         kitty.send_raw(win, "q")
     end
 end
@@ -59,36 +62,44 @@ local function paste(text, raw)
     kitty.paste(win, program, text, raw)
 end
 
----Get the help command needed to prefix a help search term for the running REPL program.
----@param win integer
----@param program string|nil
+---Wrap a query in one help command, a prefix or a { prefix, suffix } pair.
+---@param helpCmd string|string[]
 ---@param query string
----@return string?
-local function replHelpCmd(win, program, query)
-    local helpCmd = config.match.help[program] or "?"
-    -- if the config.match.help entry for a program is a table, then it means
-    -- we need to look for the current REPL prompt context to understand which
-    -- prefix is appropriate.
-    if type(helpCmd) ~= "table" then return helpCmd .. query end
-    if vim.islist(helpCmd) and #helpCmd == 2 then
-        return helpCmd[1] .. query .. helpCmd[2]
+---@return string
+local function helpFor(helpCmd, query)
+    if type(helpCmd) == "table" then return helpCmd[1] .. query .. (helpCmd[2] or "") end
+    return helpCmd .. query
+end
+
+---Command that looks a query up in the running program's help.
+---A program whose help depends on the mode it is in gets `modes` of
+---{ pattern, command }, matched in order against the prompt it is sitting at,
+---and `default` for a prompt none of them match. The prompt is taken as it is
+---rather than searched for: help text quotes prompts of its own, so a walk
+---backwards through the screen answers from whatever was last printed there.
+---@param program string|nil
+---@param prompt string|nil prompt the REPL is at, nil where none could be read
+---@param query string
+---@return string|nil
+local function replHelpCmd(program, prompt, query)
+    local name = program or "an unnamed REPL"
+    local entry = config.help[program]
+    -- false where the user dropped a shipped entry, a deep merge having no way
+    -- to delete one
+    if not entry then
+        message.warn("no help command for " .. name)
+        return
     end
-    -- otherwise key-value dict
-    local text = kitty.get_scrollback(win) or ""
-    while true do
-        local lastline = text:match("\n([^\n]*)$")
-        if lastline == nil then return end
-        text = text:sub(1, #text - #lastline - 1)
-        for pat, _helpCmd in pairs(helpCmd) do
-            if lastline:match(pat) then
-                if type(_helpCmd) == "table" then
-                    return _helpCmd[1] .. query .. _helpCmd[2]
-                else
-                    return _helpCmd .. query
-                end
-            end
-        end
+    -- one command, prefix or pair, unless the entry is keyed by prompt
+    if type(entry) ~= "table" or not (entry.modes or entry.default) then
+        return helpFor(entry, query)
     end
+    for _, mode in ipairs(entry.modes or {}) do
+        if prompt and prompt:match(mode[1]) then return helpFor(mode[2], query) end
+    end
+    if entry.default then return helpFor(entry.default, query) end
+    message.warn("no help command for " .. name .. " at " ..
+        (prompt and '"' .. prompt .. '"' or "an unreadable prompt"))
 end
 
 ---Launch a new REPL window.
@@ -252,25 +263,34 @@ function M.pasteOperator(type)
     end
 end
 
----Look up help for the word under the cursor.
-function M.help()
+---Ask the REPL about a query.
+---The screen is read once and before anything is sent, since the prompt the
+---help command is chosen by is what quitting a pager then changes. It serves
+---the pager probe too, both being questions about the same screen.
+---@param query string
+local function runHelp(query)
     local win, program = repl.current()
     if not win then return end
-    local helpcmd = replHelpCmd(win, program, fn.expand("<cword>"))
-    if helpcmd then
-        run(helpcmd, true)
-    end
+    local screen = kitty.get_screen(win)
+    -- a pager draws a footer where a REPL draws its prompt, and matching modes
+    -- against that would read the pager's colon as the REPL's own prompt
+    local prompt = screen and not kitty.is_pager(screen) and kitty.prompt_at_cursor(screen) or nil
+    local helpcmd = replHelpCmd(program, prompt, query)
+    if not helpcmd then return end
+    closePager(win, screen)
+    sync(win, program)
+    kitty.run(win, program, helpcmd, true)
+end
+
+---Look up help for the word under the cursor.
+function M.help()
+    runHelp(fn.expand("<cword>"))
 end
 
 ---Look up help for the visual selection.
 function M.helpVisual()
     cmd 'silent normal! "ky'
-    local win, program = repl.current()
-    if not win then return end
-    local helpcmd = replHelpCmd(win, program, fn.getreg('k'))
-    if helpcmd then
-        run(helpcmd, true)
-    end
+    runHelp(fn.getreg('k'))
     if config.progress then
         cmd 'silent normal! `>'
     end

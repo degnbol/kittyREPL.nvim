@@ -72,7 +72,7 @@ in a `config.lua` header comment.
 - **filetype-keyed** — chosen from the file being edited: `exclude`, `command`,
   `command_count`, `programs`, `iterate`
 - **program-keyed** — chosen from what is running: `bracketed`, `linewise`,
-  `custom`, `prompt`, `history`, `match.help`, `context`, `variables`, `assign`
+  `custom`, `prompt`, `history`, `help`, `context`, `variables`, `assign`
 
 ## Transport
 
@@ -109,9 +109,9 @@ in — the `run`/`paste` wrappers in `commands.lua` are its home.
 **Seam needed:** `kitty.send` dispatch, `repl.attach`, `replCheck`.
 
 **Still reads its own input, so neither:** `parseScrollback` takes the scrollback
-off a module global (`scrollback.lua:102`), and `replHelpCmd` fetches its own
-(`commands.lua:77`) rather than being handed text. Both were meant to be
-parameterised and were not; testing their dispatch means doing that first.
+off a module global (`scrollback.lua:108`) rather than being handed text. It was
+meant to be parameterised and was not, so testing its dispatch means doing that
+first. `replHelpCmd` was the same and is now handed the prompt it matches on.
 
 Introduce the `exec` seam (task 05); do not build a fake kitty. A fixture-driven
 fake `kitty @` that models window lifecycle and focus history is more code than
@@ -124,6 +124,6 @@ hand.
 
 `~/dotfiles/config/nvim/lua/plugins/ui.lua:8-38` — `keymap`,
 `exclude = { tex, tsv, markdown }`, `progress = true`, `editpaste = true`,
-`closepager = true`. No `bracketed`/`command`/`match` overrides, so no config-key
+`closepager = true`. No `bracketed`/`command`/`help` overrides, so no config-key
 change can break it. Behaviour changes that reach this config are called out in
 the task plans that cause them.
