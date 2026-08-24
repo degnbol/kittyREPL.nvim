@@ -20,14 +20,13 @@ chain — each plan states its own dependencies.
 | 07 ✓ | [`setup()` hygiene](plans/07-setup-hygiene.md) | 05 |
 | 08 ✓ | [README](plans/08-readme.md) | 02, 04, 05, 07 |
 | 09 ✓ | [REPL context sync](plans/09-context-sync.md) | 02, 04 |
-| 10 | [Launch environment](plans/10-launch-env.md) | — |
+| 10 ✓ | [Launch environment](plans/10-launch-env.md) | — |
 | 11 | [Runtime prompt detection](plans/11-prompt-detection.md) | 04, 05 |
 
 02 fixes a live radian paste bug on its own — land it early even if the rest
 stalls. 03 is self-contained; running it before 04 keeps `commands.lua` still
-while the registry lands. 10 is one flag and one default with no dependencies. It
-can land at any point. 11 deletes `config.match.prompt`, which fixes `[r`/`]r` in
-radian and julia.
+while the registry lands. 11 deletes `config.match.prompt`, which fixes `[r`/`]r`
+in radian and julia.
 
 ## Unplanned
 

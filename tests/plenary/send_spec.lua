@@ -141,10 +141,11 @@ describe("kitty.launch", function()
             table.insert(calls, { argv = argv })
             return { code = 0, stdout = "9\n", stderr = "" }
         end
-        assert.are.equal(9, kitty.launch("radian --r-binary /opt/R/bin/R"))
+        assert.are.equal(9, kitty.launch("pymol -xpq"))
         assert.are.same({
             "kitty", "@", "launch", "--cwd=current", "--keep-focus",
-            "radian", "--r-binary", "/opt/R/bin/R",
+            "--copy-env", "--env=NVIM",
+            "pymol", "-xpq",
         }, calls[1].argv)
     end)
 end)

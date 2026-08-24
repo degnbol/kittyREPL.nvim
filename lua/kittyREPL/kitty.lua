@@ -240,7 +240,14 @@ end
 ---@param command string?
 ---@return integer? window_id
 function M.launch(command)
-    local argv = { "launch", "--cwd=current", "--keep-focus" }
+    -- kitty otherwise execs the child with the environment kitty itself was
+    -- started with, which for a GUI-launched kitty is neither the login
+    -- shell's PATH nor its XDG dirs; over remote control --copy-env sends the
+    -- client's environment instead. vim.system stamps NVIM=v:servername on
+    -- that client (:h vim.system), so drop it again -- a bare name removes
+    -- rather than sets -- or an nvim started in the REPL window takes itself
+    -- for a nested one.
+    local argv = { "launch", "--cwd=current", "--keep-focus", "--copy-env", "--env=NVIM" }
     -- config.command values are user-authored strings, so they arrive as one
     -- word-splittable string; vim.split keeps them off a shell command line.
     vim.list_extend(argv, vim.split(command or "", "%s+", { trimempty = true }))

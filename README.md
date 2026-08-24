@@ -96,9 +96,7 @@ differ for others — an `r` buffer usually drives `radian`.
 - **`command`** — command for a new REPL window, e.g. `python = "ipython"`. Split
   on whitespace into argv and not run through a shell, so `~`, `$VAR`, globs and
   quoting are all literal. A filetype with no entry gets the value of `'shell'`.
-  The `r` default names an R binary under `/Library/Frameworks` explicitly,
-  because a kitty-launched command does not inherit the environment that would
-  otherwise find it. Change it off macOS.
+  The program starts with nvim's environment, minus `NVIM`.
 - **`command_count`** — appended to `command`, with `v:count`, when the `new` map
   is given one. `3<leader>rs` in a julia buffer runs `julia -t 3`.
 - **`iterate`** — `{ first, index, base }` expressions for taking one element out

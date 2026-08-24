@@ -142,8 +142,7 @@ local M = {
     command = {
         python = "ipython",
         julia = "julia",
-        -- kitty command doesn't know where R is since it doesn't have all the env copied.
-        r = "radian --r-binary /Library/Frameworks/R.framework/Resources/R",
+        r = "radian",
         lua = "lua",
         pymol = "pymol -xpq",
     },
