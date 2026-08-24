@@ -7,6 +7,8 @@ local repl = require("kittyREPL.repl")
 local detect = require("kittyREPL.detect")
 local scrollback = require("kittyREPL.scrollback")
 local commands = require("kittyREPL.commands")
+local context = require("kittyREPL.context")
+local util = require("kittyREPL.util")
 
 -- Re-export submodules for advanced usage
 M.kitty = kitty
@@ -14,6 +16,8 @@ M.repl = repl
 M.detect = detect
 M.scrollback = scrollback
 M.commands = commands
+M.context = context
+M.util = util
 M.config = config
 
 -- LATER: use function rather than string after pull request is merged:

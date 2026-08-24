@@ -73,6 +73,59 @@ describe("commands pager probe", function()
     end)
 end)
 
+describe("commands context sync", function()
+    local hooks, paste
+    before_each(function()
+        hooks, paste = config.context.python, kitty.paste
+        config.context.python = { one = function() return "1" end }
+    end)
+    after_each(function()
+        config.context.python, kitty.paste = hooks, paste
+    end)
+
+    ---Bind to a window a program resolves for, so context hooks apply.
+    ---Every case passes an id of its own: the memo of what a window has been
+    ---told outlives the test that filled it.
+    ---@param win integer
+    local function attach(win)
+        kitty.window = function()
+            return { id = win, foreground_processes = { { cmdline = { "python" } } } }
+        end
+        vim.b.repl_win = win
+    end
+
+    it("sends the context line before the code, once per counted action", function()
+        open("python", { "a", "b" }, { 1, 0 })
+        attach(78)
+        local sends = {}
+        kitty.run = function(_, _, text) table.insert(sends, text) end
+        -- v:count1 is only set inside a mapping, so this one is pressed, not called
+        vim.keymap.set("n", "R", commands.runLine, { buffer = 0 })
+        vim.api.nvim_feedkeys("2R", "mx", false)
+        assert.are.same({ "1", "a", "b" }, sends)
+    end)
+
+    it("does not send it again for the next action", function()
+        open("python", { "a" }, { 1, 0 })
+        attach(79)
+        local sends = {}
+        kitty.run = function(_, _, text) table.insert(sends, text) end
+        commands.runLine()
+        commands.runLine()
+        assert.are.same({ "1", "a", "a" }, sends)
+    end)
+
+    it("syncs before a paste too", function()
+        open("python", { "a" }, { 1, 0 })
+        attach(80)
+        local sends = {}
+        kitty.run = function(_, _, text) table.insert(sends, text) end
+        kitty.paste = function(_, _, text) table.insert(sends, "paste:" .. text) end
+        commands.pasteLine()
+        assert.are.same({ "1", "paste:a" }, sends)
+    end)
+end)
+
 describe("commands.runLineFor", function()
     it("sends the first element of the iterable, iterator or not", function()
         open("python", { "for scene, _arrows in zip(scenes, arrows, strict=True):", "    pass" }, { 1, 0 })

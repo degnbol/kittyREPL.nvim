@@ -9,9 +9,10 @@ local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local message = require("kittyREPL.message")
 
--- [win] = { program = "radian"|nil, pending = "radian"|nil }
+-- [win] = { program = "radian"|nil, pending = "radian"|nil, sent = {}|nil }
 -- `pending` is the launch word, standing in until resolution succeeds:
 -- `kitty @ launch` returns before the program appears in foreground_processes.
+-- `sent` is the context-sync memo, described at M.sent.
 local wins = {}
 
 ---Program name a command word invokes.
@@ -91,6 +92,8 @@ end
 local function remember(win, program)
     if not program then return end
     local state = wins[win] or {}
+    -- a different program is a different REPL, whatever it has been told before
+    if state.program ~= program then state.sent = nil end
     state.program, state.pending = program, nil
     wins[win] = state
 end
@@ -151,6 +154,23 @@ function M.program(win)
     if state and state.program then return state.program end
     local _, program = identify(win)
     return program or (state and state.pending)
+end
+
+---Context code a window has already been told, keyed by context key.
+---Created on first use, and dropped when a launch re-attaches the window or its
+---program resolves to a different name, so a REPL that cannot have heard the
+---code is not assumed to have. A REPL restarted in place under the same name is
+---indistinguishable without a pid, which the header explains we do not key on,
+---so it keeps the memo until something else invalidates it.
+---Keyed by window rather than buffer: one REPL serves many buffers, and that
+---sharing is why buffer-dependent state goes stale in the first place.
+---@param win integer
+---@return table<string, string>
+function M.sent(win)
+    local state = wins[win] or {}
+    state.sent = state.sent or {}
+    wins[win] = state
+    return state.sent
 end
 
 ---The window this buffer sends to.

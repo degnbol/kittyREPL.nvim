@@ -155,6 +155,37 @@ describe("repl.attach", function()
     end)
 end)
 
+describe("repl.sent", function()
+    local ls
+    before_each(function() ls = kitty.window end)
+    after_each(function() kitty.window = ls end)
+
+    it("keeps what a window was told while it runs the same program", function()
+        kitty.window = function() return window("julia id=9", "/opt/julia/bin/julia") end
+        repl.attach(9)
+        repl.sent(9)["ctx:revise"] = "using Revise"
+        repl.attach(9)
+        assert.are.same({ ["ctx:revise"] = "using Revise" }, repl.sent(9))
+    end)
+
+    it("drops it once the window runs something else", function()
+        kitty.window = function() return window("julia id=10", "/opt/julia/bin/julia") end
+        repl.attach(10)
+        repl.sent(10)["ctx:revise"] = "using Revise"
+        kitty.window = function() return window("ipython id=10", "/bin/python3", "/bin/ipython") end
+        repl.attach(10)
+        assert.are.same({}, repl.sent(10))
+    end)
+
+    it("drops it when a launch takes the window over", function()
+        kitty.window = function() return window("julia id=11", "/opt/julia/bin/julia") end
+        repl.attach(11)
+        repl.sent(11)["ctx:revise"] = "using Revise"
+        repl.attach(11, "julia")
+        assert.are.same({}, repl.sent(11))
+    end)
+end)
+
 describe("program names", function()
     -- match.prompt is the one program-keyed table that has to be total:
     -- scrollback.parseScrollback refuses to parse without a prompt pattern,

@@ -5,7 +5,8 @@
 -- * filetype, i.e. the file being edited:
 --   exclude, command, command_count, iterate, programs
 -- * program, i.e. what runs in the REPL window:
---   bracketed, linewise, custom, match.prompt, match.help
+--   bracketed, linewise, custom, context, variables, assign, match.prompt,
+--   match.help
 -- programs bridges the two: it is keyed by filetype and its values are program
 -- names. A program name and a filetype coincide for some languages (julia, lua)
 -- and differ for others (an r buffer drives radian).
@@ -90,6 +91,33 @@ local M = {
             kitty().send_bracketed(win, text, post)
         end,
     },
+    -- Program-keyed hooks for REPL-side state that should track nvim-side
+    -- state. Each returns a line of code, or nil or "" to contribute nothing --
+    -- an empty line would otherwise be sent as a bare newline. A line is sent
+    -- when its text differs from what that window was last told. That
+    -- covers once-per-REPL setup ("using Revise", constant forever after) and
+    -- change tracking (a cwd, resent when it changes) with no event model.
+    context = {},
+    -- Program-keyed values to keep assigned, the common case of context. Each
+    -- returns the string to assign, or nil to assign nothing.
+    variables = {
+        ipython = {
+            __file__ = function()
+                local name = vim.api.nvim_buf_get_name(0)
+                -- A sentinel rather than nil, which would leave the previous
+                -- buffer's path assigned. The basename is also what makes
+                -- multiprocessing.spawn._fixup_main_from_path short-circuit
+                -- instead of re-running the file in every spawned child, so a
+                -- real path here means workers execute that file's top level,
+                -- as running it as a script would.
+                return name ~= "" and name or "ipython"
+            end,
+        },
+    },
+    -- Program-keyed assignment syntax for `variables`, taking a name and the
+    -- raw value. Without an entry the value is quoted as a string literal:
+    -- `name = "value"`, which a shell would need spelled without the spaces.
+    assign = {},
     -- Filetype-keyed sets of the program names a filetype accepts as its REPL,
     -- used to find a REPL window automatically. Union of the values is also the
     -- closed set of names identity resolution can return, so a window running

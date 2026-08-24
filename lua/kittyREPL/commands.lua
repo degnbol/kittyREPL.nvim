@@ -5,6 +5,7 @@ local config = require("kittyREPL.config")
 local kitty = require("kittyREPL.kitty")
 local repl = require("kittyREPL.repl")
 local binding = require("kittyREPL.binding")
+local context = require("kittyREPL.context")
 local message = require("kittyREPL.message")
 
 local cmd = vim.cmd
@@ -18,6 +19,23 @@ local function closePager(win)
     end
 end
 
+---Bring a REPL's context up to date, so what follows runs against nvim's state.
+---Belongs beside closePager, once per user action: hooks are user code, and a
+---counted action has no reason to evaluate them per line.
+---The code that follows needs no waiting for. Bytes queue in the tty, so it is
+---read in order even while a slow context line is still running.
+---A line is marked delivered on hand-off, the send path having no confirmation
+---to give. With `closepager` off nothing probes for a pager, so a line sent into
+---one is eaten as keystrokes and still counted as delivered.
+---@param win integer
+---@param program string|nil
+local function sync(win, program)
+    for _, entry in ipairs(context.pending(win, program)) do
+        kitty.run(win, program, entry.code)
+        context.mark(win, entry.key, entry.code)
+    end
+end
+
 ---Send text to the buffer's REPL and execute it.
 ---@param text string
 ---@param raw boolean?
@@ -25,16 +43,19 @@ local function run(text, raw)
     local win, program = repl.current()
     if not win then return end
     closePager(win)
+    sync(win, program)
     kitty.run(win, program, text, raw)
 end
 
 ---Send text to the buffer's REPL without executing it.
+---A context line executes first, then the staged text sits at the prompt.
 ---@param text string
 ---@param raw boolean?
 local function paste(text, raw)
     local win, program = repl.current()
     if not win then return end
     closePager(win)
+    sync(win, program)
     kitty.paste(win, program, text, raw)
 end
 
@@ -112,12 +133,14 @@ function M.setLast()
 end
 
 ---Send the current line to the buffer's REPL v:count times, progressing a line
----between sends. The REPL is resolved and its pager cleared once for the lot.
+---between sends. The REPL is resolved, its pager cleared and its context synced
+---once for the lot.
 ---@param send fun(win: integer, program: string|nil, text: string)
 local function sendLines(send)
     local win, program = repl.current()
     if not win then return end
     closePager(win)
+    sync(win, program)
     for _ = 1, vim.v.count1 do
         send(win, program, vim.api.nvim_get_current_line())
         if config.progress then

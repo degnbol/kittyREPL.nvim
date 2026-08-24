@@ -65,7 +65,7 @@ silently ignored.
 
 | keyed by filetype — the file you edit | keyed by program — what runs in the REPL window |
 |---|---|
-| `exclude`, `command`, `command_count`, `iterate` | `bracketed`, `linewise`, `custom`, `match.prompt`, `match.help` |
+| `exclude`, `command`, `command_count`, `iterate` | `bracketed`, `linewise`, `custom`, `context`, `variables`, `assign`, `match.prompt`, `match.help` |
 
 `programs` bridges the two: it is keyed by filetype and its values are program
 names. A name and a filetype coincide for some languages (`julia`, `lua`) and
@@ -128,6 +128,41 @@ differ for others — an `r` buffer usually drives `radian`.
   prompt the REPL is sitting at. That default presumes TerminalPager is installed.
 
 Send-path precedence: `custom`, then `bracketed`, then `linewise`, then raw.
+
+### Context sync
+
+REPL-side state that should track nvim-side state, sent ahead of the next code
+to reach that window.
+
+- **`context`** — hooks returning a line of code, or `nil` or `""` to contribute
+  nothing: `context.julia = { revise = function() return "using Revise" end }`.
+  A line is sent only when its text differs from what that window was last told,
+  so constant code runs once per REPL and code built from nvim state is resent
+  exactly when that state changes — no events involved. A hook that throws is
+  reported and skips only itself.
+- **`variables`** — a value to assign rather than a statement to write, the
+  common case. Ships `ipython.__file__`, tracking the current buffer's path so
+  `Path(__file__)` idioms work at the prompt.
+- **`assign`** — `function(name, value)` writing one `variables` entry,
+  defaulting to `name = "value"` with the value quoted by
+  `require("kittyREPL.util").quote`. Needed where that is not the syntax — a
+  shell takes no spaces around `=`, and `quote` is not a shell escaper either.
+
+`variables` are sent before `context` hooks, each in key order. The memo is per
+kitty window, not per buffer — one REPL serves many buffers, which is what makes
+`__file__` go stale in the first place. It is dropped when a launch re-attaches
+the window or the window's program resolves to a different name. A REPL restarted
+in place under the same name is indistinguishable and keeps the memo. A line that
+errors in the REPL still counts as delivered, so a hook the REPL cannot run fails
+once rather than on every send.
+
+The shipped `__file__` falls back to `"ipython"` for a buffer with no name,
+matching what an `InteractiveShellApp.exec_lines` entry can set for sessions nvim
+never touches. Returning `nil` would instead leave the previous buffer's path
+assigned. That basename is also what makes
+`multiprocessing.spawn._fixup_main_from_path` short-circuit instead of re-running
+the file in every spawned child, so a real path means workers execute that file's
+top level — as running it as a script would, if it guards on `__name__`.
 
 ## Keymaps
 

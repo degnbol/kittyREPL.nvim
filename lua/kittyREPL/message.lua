@@ -23,6 +23,15 @@ function M.warn(msg)
     vim.notify(PREFIX .. msg, vim.log.levels.WARN)
 end
 
+---Report a fault in user config, e.g. a hook that threw.
+---Once per message, since config is consulted on every send and so a fault in it
+---recurs on every keypress. A second broken entry still reports, wording being
+---what these are keyed on.
+---@param msg string
+function M.error(msg)
+    vim.notify_once(PREFIX .. msg, vim.log.levels.ERROR)
+end
+
 ---Report a problem that recurs on every keypress, e.g. an unusable kitty.
 ---@param msg string
 function M.warn_once(msg)
