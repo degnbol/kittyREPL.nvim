@@ -1,18 +1,24 @@
 # TODO
 
-[plans/12-integration-fixes.md](plans/12-integration-fixes.md) — what an
-integration review of the finished refactor turned up. Sections A and B are live
-bugs on the send path.
-
-Paste correct indentation with awareness of radian's own indentation settings —
-`radian.indent_lines`, `radian.auto_indentation`.
-https://github.com/randy3k/radian
-Interacts with task 02, which changes radian's paste path to bracketed.
-
-Make operator suffixes like `<CR>ap` a no-op when there's no REPL attached. Currently `<CR>` reports "No REPL" and the `ap`
-motion still fires.
-
-`vim.cmd` has hl injection in the string but this is missing for `cmd = vim.cmd`.
-We should probably use the full form `vim.cmd` so we get the syntax hl.
-
 Maybe extend to the ghostty terminal.
+
+`pasteOutput` inserts the whole session: `--extent=last_cmd_output` marks the
+shell command that started the REPL. Cut the scrollback on the learned prompt
+instead — `plans/15-last-output.md`.
+
+Resolve a REPL running behind a wrapper: `uv run ipython` reports `uv` as its
+last foreground process — `plans/13-wrapper-identity.md`.
+
+`<CR>ap` with no REPL attached warns, then lets `ap` run as normal-mode keys and
+edit the buffer — `plans/16-operator-motion.md`.
+
+`--copy-env` (`kitty.lua:271`) is untested when `kitty @` reaches a local kitty
+from an nvim running over the ssh kitten. Not a direction we use, left untested.
+
+Detect a REPL's continuation prompt instead of assuming the default.
+`_PROMPT2`, `sys.ps2` and `options(continue=)` are all customisable, so the
+`config.continuation` defaults `plans/14-continuation-echo.md` ships can be wrong.
+
+`[r` in a shell REPL recalls previous sessions, not the current one: zsh writes
+`.zsh_history` on exit only (`zsh/zshrc.zsh:44-46` — no `inc_append_history`), and
+`scrollback.lua:96-98` prefers a non-empty history file over the scrollback.
